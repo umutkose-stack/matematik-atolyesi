@@ -1,0 +1,12 @@
+<p>Bir dizinin ilk üç terimini silsek, dördüncü terimden başlayıp onları geri bulabilir miyiz? Padovan kuralının güzel tarafı şu: Art arda gelen üç sayıyı biliyorsak geçmiş de gelecek kadar belirli.</p>
+<h2>Üç sayılık bir pencere</h2><p>Bu örnekte P₀ = 0, P₁ = 0, P₂ = 1 alalım. Kural Pₙ₊₃ = Pₙ + Pₙ₊₁. Yan yana üç terimi (a, b, c) diye yazarsak pencere bir adım sağa kaydığında (b, c, a + b) olur. Örneğin (0, 0, 1) → (0, 1, 0) → (1, 0, 1).</p>
+<h2>Silinen terim nereye gitti?</h2><p>Yeni pencereyi (u, v, w) olarak okuyan biri, eski ikinci terimin u, üçüncünün v olduğunu hemen görür. Eski ilk terimi ise son hücreden kurtarır: w = a + u olduğundan a = w − u. Geriye doğru hareketin tamamı böylece (u, v, w) → (w − u, u, v) olur.</p>
+<p>(0, 0, 1) ile başlayıp bu geri adımı üç kez uygulayalım:</p><ol><li>(1, 0, 0) elde edilir. İlk hücre P₋₁ = 1.</li><li>(−1, 1, 0) elde edilir. İlk hücre P₋₂ = −1.</li><li>(1, −1, 1) elde edilir. İlk hücre P₋₃ = 1.</li></ol>
+<h2>Ters matrisin satırları nereden geliyor?</h2><p>Pencereyi eskiden yeniye sıralanmış bir sütun olarak yazalım. Aşağıdaki iki matris bu yazım sırasına aittir. Her satır, sonuçtaki bir hücrenin tarifidir.</p>
+<div class="matrices"><div>İleri adım <pre>⎡ 0  1  0 ⎤
+⎢ 0  0  1 ⎥
+⎣ 1  1  0 ⎦</pre></div><div>Geri adım <pre>⎡−1  0  1 ⎤
+⎢ 1  0  0 ⎥
+⎣ 0  1  0 ⎦</pre></div></div>
+<p>Sağdaki matrisin ilk satırını (u, v, w) sütunuyla çarp: −u + w. Diğer iki satır u ve v’yi kopyalar. İleri adımdan çıkan (b, c, a + b) üçlüsüne bunu uygularsak ((a + b) − b, b, c) = (a, b, c) buluruz. Hesap her üçlü için çalıştığından sağdaki matris soldakinin tersidir. Üç adım geri gitmek de aynı ters matrisi üç kez uygulamaktır.</p>
+<p><small>Okuma notu · Bu sayfa, “An Affine Hill Cipher Scheme Based on Padovan Sequences” çalışma taslağındaki negatif indisler konusunun, burada tanımlanan pencere sırasıyla hazırlanmış bir anlatımıdır.</small></p>
