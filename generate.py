@@ -70,7 +70,7 @@ PHONE_DISPLAY=''; PHONE_TEL=''; WHATSAPP=''
 contact_html=(f'<p class="phone">Telefon / WhatsApp: <a href="tel:{PHONE_TEL}">{PHONE_DISPLAY}</a></p><a class="cta light" href="{WHATSAPP}">WhatsApp’tan yaz</a>' if PHONE_DISPLAY else '<p class="phone">İletişim bilgileri çok yakında burada olacak.</p>')
 feats=[('stat','10+','Yıl eğitim deneyimi','Online ve yüz yüze birebir derslerde, farklı seviye ve hedeflere yönelik kişiselleştirilmiş matematik eğitimi.'),
  ('stat','100.000+','Dakika online ders','Yalnızca inekle.com platformunda gerçekleştirilen aktif birebir ders tecrübesi.'),
- ('','','Derece ve üniversite başarıları','Geçtiğimiz yıl görev aldığım kurumda LGS’de Türkiye birincisi çıkaran eğitim kadrosunun parçasıydım. Lise gruplarında ODTÜ, Boğaziçi ve Koç gibi üniversitelere yerleşen öğrenciler yetiştirdim.'),
+ ('','','Derece ve üniversite başarıları','LGS Türkiye birincisini çıkaran eğitim kadrosunda yer aldım. Lise gruplarında ODTÜ, Boğaziçi ve Koç gibi üniversitelere yerleşen öğrenciler yetiştirdim.'),
  ('','','Müfredat ve yayın hâkimiyeti','Sınav Koleji, Palme Yayınevi soru çözümleri ve Sebit bünyesindeki müfredat çalışmalarıyla öğrencilerin en sık zorlandığı noktalara doğrudan çözüm.'),
  ('','','Uluslararası deneyim','İngiltere ve Almanya’dan öğrencilere, IB ve SAT’e hazırlanan öğrencilere ders verdim. Münster Üniversitesi ve Friedrich-Alexander Üniversitesi’nden (FAU) aldığım Data Science ve Matematik yüksek lisans kabulleri, yurt dışında eğitim hedefleyen öğrencilere de yol göstermemi sağlıyor.')]
 ORGS=['Sebit','Sınav Koleji','Özel Artı Analiz','Palme Yayınevi','inekle.com']
