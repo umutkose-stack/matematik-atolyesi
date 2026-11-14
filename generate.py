@@ -46,7 +46,7 @@ for i,(slug,category,title,sub,p,q) in enumerate(items):
     cards+=f'<a class="card" href="{slug}.html">{art(i)}<span class="label">{category}</span><h3>{title}</h3><small>{sub} ↗</small></a>'
     article = (Path(__file__).parent / "articles" / (slug + ".html")).read_text()
     Path(slug+'.html').write_text(page(title,f'<article class="story"><a class="back" href="index.html#icerikler">← Tüm içerikler</a><div class="label">{category}</div><h1>{title}</h1>{article}</article>'))
-body=f'<section class="hero"><div><div class="label">Umut Köse / Kişisel portfolyo</div><h1>Matematik<br><em>atölyem.</em></h1><p>Ben Umut, matematik yüksek lisans öğrencisiyim. Matematikle uğraşmayı da, onu anlatmayı da çok seviyorum. Burada kısa yazılar, ders dosyaları ve araştırma notlarımı bulabilirsin.</p><a class="cta" href="#icerikler">İçerikleri keşfet ↓</a></div>{art(0)}</section><section class="collection" id="icerikler"><h2>Seçili içerikler</h2><div class="grid">{cards}</div></section><section class="about" id="hakkimda"><h2>Hakkımda</h2><p>Merhaba, ben bir matematik yüksek lisans öğrencisiyim. Hayatımın iki büyük tutkusu var: matematiği derinlemesine çalışmak ve öğrendiklerimi başkalarına anlatmak.</p><p>Burayı formüllerin arkasındaki hikâyeleri, şaşırtıcı örüntüleri ve günlük hayatın içindeki matematiği boğmadan, keyifle okuyabileceğin kısa yazılarla dolduruyorum.</p><p>Matematiğin yanında veriyle çalışan araçlar geliştiriyorum. Bunlardan biri BIST şirketlerinin finansal tablolarını incelemek için hazırladığım proje.</p><a href="https://github.com/umutkose-stack/bist-tablolar"><u>BIST Tablolar projesi ↗</u></a></section>'
+body=f'<section class="hero"><div><div class="label">Umut Köse / Kişisel portfolyo</div><h1>Matematik<br><em>atölyem.</em></h1><p>Ben Umut, matematik yüksek lisans öğrencisiyim. Matematikle uğraşmayı da, onu anlatmayı da çok seviyorum. Burada kısa yazılar, ders dosyaları ve araştırma notlarımı bulabilirsin.</p><a class="cta" href="#icerikler">İçerikleri keşfet ↓</a></div>{art(0)}</section><section class="collection" id="icerikler"><h2>Seçili içerikler</h2><div class="grid">{cards}</div></section><section class="about" id="hakkimda"><h2>Hakkımda</h2><p>Merhaba, ben bir matematik yüksek lisans öğrencisiyim. Hayatımın iki büyük tutkusu var: matematiği derinlemesine çalışmak ve öğrendiklerimi başkalarına anlatmak.</p><p>Burayı formüllerin arkasındaki hikâyeleri, şaşırtıcı örüntüleri ve günlük hayatın içindeki matematiği boğmadan, keyifle okuyabileceğin kısa yazılarla dolduruyorum.</p><p>Matematiğin yanında veriyle çalışan araçlar geliştiriyorum. Bunlardan biri BIST şirketlerinin finansal tablolarını incelemek için hazırladığım proje.</p><a href="https://umutkose-stack.github.io/bist-tablolar/"><u>BIST Tablolar’ı aç ↗</u></a></section>'
 Path('index.html').write_text(page('Matematik atölyem',body))
 
 from lessons import lessons
@@ -71,11 +71,12 @@ for slug,extra in extras.items():
     path.write_text(path.read_text().replace('</article>',extra+'</article>'))
 
 rows=''
-for slug,level,title,subtitle,p,a,q,b in lessons:
+SHOW_LESSONS = False  # Ders dosyaları şimdilik gizli; tekrar açmak için True yap
+for slug,level,title,subtitle,p,a,q,b in (lessons if SHOW_LESSONS else []):
     rows+=f'<a class="lesson" href="{slug}.html"><span class="label">{level}</span><strong>{title}</strong><span aria-hidden="true">↗</span></a>'
     content=f'<article class="story"><a class="back" href="index.html#dersler">← Ders dosyaları</a><div class="label">{level}</div><h1>{title}</h1><p>{subtitle}</p><h2>Birlikte çözelim</h2>{question(p,a)}<h2>Sıra sende</h2>{question(q,b)}</article>'
     Path(slug+'.html').write_text(page(title,content))
-body=body.replace('<section class="about"',f'<section class="collection" id="dersler"><h2>Ders dosyaları</h2>{rows}</section><section class="about"')
+if SHOW_LESSONS: body=body.replace('<section class="about"',f'<section class="collection" id="dersler"><h2>Ders dosyaları</h2>{rows}</section><section class="about"')
 Path('index.html').write_text(page('Matematik atölyem',body))
 with Path('style.css').open('a') as styles:
     styles.write("""
