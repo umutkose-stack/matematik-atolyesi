@@ -70,7 +70,7 @@ PHONE_DISPLAY=''; PHONE_TEL=''; WHATSAPP=''
 contact_html=(f'<p class="phone">Telefon / WhatsApp: <a href="tel:{PHONE_TEL}">{PHONE_DISPLAY}</a></p><a class="cta light" href="{WHATSAPP}">WhatsApp’tan yaz</a>' if PHONE_DISPLAY else '<p class="phone">İletişim bilgileri çok yakında burada olacak.</p>')
 feats=[('stat','10+','Yıl eğitim deneyimi','Online ve yüz yüze birebir derslerde, farklı seviye ve hedeflere yönelik kişiselleştirilmiş matematik eğitimi.'),
  ('stat','100.000+','Dakika online ders','Yalnızca inekle.com platformunda gerçekleştirilen aktif birebir ders tecrübesi.'),
- ('','','Derece kadrosu deneyimi','Geçtiğimiz yıl görev aldığım kurumda LGS Türkiye birincisi çıkaran eğitim kadrosunda aktif rol.'),
+ ('','','Kurumsal kadro deneyimi','Geçtiğimiz yıl görev aldığım kurumda hem LGS hem lise gruplarında ders verdim; o yıl LGS’de Türkiye birincisi çıkaran eğitim kadrosunun bir parçasıydım.'),
  ('','','Müfredat ve yayın hâkimiyeti','Sınav Koleji, Palme Yayınevi soru çözümleri ve Sebit bünyesindeki müfredat çalışmalarıyla öğrencilerin en sık zorlandığı noktalara doğrudan çözüm.'),
  ('','','Akademik vizyon','Münster Üniversitesi ve Friedrich-Alexander Üniversitesi (FAU) Data Science ve Matematik yüksek lisans kabulleri.')]
 feat_html=''.join(f'<div class="feat {k}">'+(f'<strong class="big">{n}</strong>' if n else '')+f'<h3>{t}</h3><p>{d}</p></div>' for k,n,t,d in feats)
