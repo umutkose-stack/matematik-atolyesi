@@ -46,10 +46,13 @@ css="""*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;backgro
 .collection,.about{border-top:1px solid #bdc2b2;padding:35px 0 49px}h2{font-size:clamp(32px,4vw,48px);letter-spacing:-.045em}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:23px;margin-top:26px}.card svg{width:100%;height:auto;display:block;margin-bottom:14px}.card h3{font-size:27px;margin:8px 0}.card small{font-size:14px}.about p,article p{max-width:65ch}.back{display:inline-block;margin:28px 0}.story{max-width:820px;margin:0 auto 50px}.story h1{font-size:clamp(43px,6vw,74px);margin:12px 0 24px}.story svg{width:100%;height:220px;display:block}.story p{font-family:Georgia,serif;font-size:20px}footer{border-top:1px solid #bdc2b2;padding-top:22px;padding-bottom:24px}a:focus-visible{outline:3px solid #a64b32;outline-offset:4px}@media(max-width:700px){header{height:62px}nav{gap:12px;font-size:14px}.hero{grid-template-columns:1fr;gap:26px;padding:36px 0}.hero svg{aspect-ratio:2;border-radius:100px 100px 3px 3px}.grid{grid-template-columns:1fr}.card svg{height:180px}.brand{font-size:19px}}"""
 Path('style.css').write_text(css)
 SITE_URL='https://umutkose-stack.github.io/matematik-atolyesi/'
+# Yayına hazır olunca True yap: arama motorları siteyi indeksleyebilir.
+INDEXABLE=False
+ROBOTS='' if INDEXABLE else '<meta name="robots" content="noindex, nofollow">'
 SITE_DESC='ODTÜ Matematik mezunu ve ICF akreditasyonlu eğitim koçu Umut Köse ile ezberlemeden, mantığıyla matematik: birebir dersler, sınav hazırlığı ve süreç takibi.'
 def meta(title,desc=SITE_DESC,path=''):
     t=f'{title} · Umut Köse'
-    return (f'<meta name="description" content="{desc}"><link rel="canonical" href="{SITE_URL}{path}">'
+    return (ROBOTS+f'<meta name="description" content="{desc}"><link rel="canonical" href="{SITE_URL}{path}">'
       f'<meta property="og:type" content="website"><meta property="og:site_name" content="Matematik Atölyesi">'
       f'<meta property="og:title" content="{t}"><meta property="og:description" content="{desc}">'
       f'<meta property="og:url" content="{SITE_URL}{path}"><meta property="og:image" content="{SITE_URL}og.png">'
@@ -149,5 +152,5 @@ with Path("style.css").open("a") as styles:
 
 # Eski /dist/ adreslerini yeni köke yönlendir (GitHub Actions yayınında dist/ içeriği kökte durur)
 Path('dist').mkdir(exist_ok=True)
-Path('dist/index.html').write_text('<!doctype html><meta charset="utf-8"><title>Taşındı</title><meta http-equiv="refresh" content="0; url=../"><link rel="canonical" href="'+SITE_URL+'"><a href="../">Siteye git</a>')
-Path('404.html').write_text('<!doctype html><html lang="tr"><meta charset="utf-8"><title>Sayfa bulunamadı · Umut Köse</title><script>var p=location.pathname;if(p.indexOf("/dist/")>-1){location.replace(p.replace("/dist/","/")+location.hash);}</script><body style="font:16px/1.6 Arial,sans-serif;background:#f7f4eb;color:#203d35;padding:10vh 8%"><h1 style="font:400 48px Georgia,serif">Bu sayfa bulunamadı</h1><p><a href="'+SITE_URL+'">Ana sayfaya dön</a></p></body></html>')
+Path('dist/index.html').write_text('<!doctype html><meta charset="utf-8"><title>Taşındı</title>'+ROBOTS+'<meta http-equiv="refresh" content="0; url=../"><link rel="canonical" href="'+SITE_URL+'"><a href="../">Siteye git</a>')
+Path('404.html').write_text('<!doctype html><html lang="tr"><meta charset="utf-8"><title>Sayfa bulunamadı · Umut Köse</title>'+ROBOTS+'<script>var p=location.pathname;if(p.indexOf("/dist/")>-1){location.replace(p.replace("/dist/","/")+location.hash);}</script><body style="font:16px/1.6 Arial,sans-serif;background:#f7f4eb;color:#203d35;padding:10vh 8%"><h1 style="font:400 48px Georgia,serif">Bu sayfa bulunamadı</h1><p><a href="'+SITE_URL+'">Ana sayfaya dön</a></p></body></html>')
