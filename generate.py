@@ -45,13 +45,23 @@ css="""*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;backgro
 .weekly-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:44px;align-items:start;margin-top:18px}.weekly-grid figure{margin:0;text-align:center}.weekly-grid svg{display:block;width:100%;max-width:300px;margin:0 auto}.weekly h3{font-size:30px}.weekly p{max-width:60ch}.weekly details{margin-top:12px}@media(max-width:760px){.weekly-grid{grid-template-columns:1fr;gap:20px}}
 .collection,.about{border-top:1px solid #bdc2b2;padding:35px 0 49px}h2{font-size:clamp(32px,4vw,48px);letter-spacing:-.045em}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:23px;margin-top:26px}.card svg{width:100%;height:auto;display:block;margin-bottom:14px}.card h3{font-size:27px;margin:8px 0}.card small{font-size:14px}.about p,article p{max-width:65ch}.back{display:inline-block;margin:28px 0}.story{max-width:820px;margin:0 auto 50px}.story h1{font-size:clamp(43px,6vw,74px);margin:12px 0 24px}.story svg{width:100%;height:220px;display:block}.story p{font-family:Georgia,serif;font-size:20px}footer{border-top:1px solid #bdc2b2;padding-top:22px;padding-bottom:24px}a:focus-visible{outline:3px solid #a64b32;outline-offset:4px}@media(max-width:700px){header{height:62px}nav{gap:12px;font-size:14px}.hero{grid-template-columns:1fr;gap:26px;padding:36px 0}.hero svg{aspect-ratio:2;border-radius:100px 100px 3px 3px}.grid{grid-template-columns:1fr}.card svg{height:180px}.brand{font-size:19px}}"""
 Path('style.css').write_text(css)
-def page(title,body):
-    return f'<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · Umut Köse</title><link rel="stylesheet" href="style.css"><header><a class="brand" href="index.html">Umut Köse<span style="color:#a64b32">.</span></a><nav><a href="index.html#hakkimda">Hakkımda</a><a href="index.html#yaklasim">Yaklaşım</a><a href="index.html#icerikler">Yazılar</a><a href="index.html#iletisim">İletişim</a></nav></header><main>{body}</main><footer><b>Umut Köse</b><span class="foot-links"><a href="https://umutkose-stack.github.io/bist-tablolar/">BIST Tablolar ↗</a><a href="https://github.com/umutkose-stack">GitHub ↗</a></span></footer></html>'
+SITE_URL='https://umutkose-stack.github.io/matematik-atolyesi/'
+SITE_DESC='ODTÜ Matematik mezunu ve ICF akreditasyonlu eğitim koçu Umut Köse ile ezberlemeden, mantığıyla matematik: birebir dersler, sınav hazırlığı ve süreç takibi.'
+def meta(title,desc=SITE_DESC,path=''):
+    t=f'{title} · Umut Köse'
+    return (f'<meta name="description" content="{desc}"><link rel="canonical" href="{SITE_URL}{path}">'
+      f'<meta property="og:type" content="website"><meta property="og:site_name" content="Matematik Atölyesi">'
+      f'<meta property="og:title" content="{t}"><meta property="og:description" content="{desc}">'
+      f'<meta property="og:url" content="{SITE_URL}{path}"><meta property="og:image" content="{SITE_URL}og.png">'
+      f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:locale" content="tr_TR">'
+      f'<meta name="twitter:card" content="summary_large_image">')
+def page(title,body,desc=SITE_DESC,path=''):
+    return f'<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title} · Umut Köse</title>{meta(title,desc,path)}<link rel="stylesheet" href="style.css"><header><a class="brand" href="index.html">Umut Köse<span style="color:#a64b32">.</span></a><nav><a href="index.html#hakkimda">Hakkımda</a><a href="index.html#yaklasim">Yaklaşım</a><a href="index.html#icerikler">Yazılar</a><a href="index.html#iletisim">İletişim</a></nav></header><main>{body}</main><footer><b>Umut Köse</b><span class="foot-links"><a href="https://umutkose-stack.github.io/bist-tablolar/">BIST Tablolar ↗</a><a href="https://github.com/umutkose-stack">GitHub ↗</a></span></footer></html>'
 cards=''
 for i,(slug,category,title,sub,p,q) in enumerate(items):
     cards+=f'<a class="card" href="{slug}.html">{art(i)}<span class="label">{category}</span><h3>{title}</h3><small>{sub} ↗</small></a>'
     article = (Path(__file__).parent / "articles" / (slug + ".html")).read_text()
-    Path(slug+'.html').write_text(page(title,f'<article class="story"><a class="back" href="index.html#icerikler">← Tüm yazılar</a><div class="label">{category}</div><h1>{title}</h1>{article}</article>'))
+    Path(slug+'.html').write_text(page(title,desc=f'{sub}. Matematik Atölyesi’nden kısa bir yazı.',path=slug+'.html',body=f'<article class="story"><a class="back" href="index.html#icerikler">← Tüm yazılar</a><div class="label">{category}</div><h1>{title}</h1>{article}</article>'))
 # İletişim: numara eklenince aşağıdaki üç değeri doldur, bölüm kendiliğinden güncellenir.
 PHONE_DISPLAY=''; PHONE_TEL=''; WHATSAPP=''
 contact_html=(f'<p class="phone">Telefon / WhatsApp: <a href="tel:{PHONE_TEL}">{PHONE_DISPLAY}</a></p><a class="cta light" href="{WHATSAPP}">WhatsApp’tan yaz</a>' if PHONE_DISPLAY else '<p class="phone">İletişim bilgileri çok yakında burada olacak.</p>')
@@ -136,3 +146,8 @@ summary{cursor:pointer;font-weight:bold}.lab{margin:30px 0}.lab h2{margin:0 0 15
 
 with Path("style.css").open("a") as styles:
     styles.write(".matrices{display:flex;gap:2rem;flex-wrap:wrap}.matrices pre{font-size:18px;margin:5px 0}.story figure{margin:1rem 0;background:#eeeade;padding:12px}.story figcaption,.story caption{font-size:14px;text-align:left}.story table{width:100%;border-collapse:collapse}.story th,.story td{text-align:left;padding:6px;border-bottom:1px solid #bdc2b2}.story details+details{margin-top:12px}")
+
+# Eski /dist/ adreslerini yeni köke yönlendir (GitHub Actions yayınında dist/ içeriği kökte durur)
+Path('dist').mkdir(exist_ok=True)
+Path('dist/index.html').write_text('<!doctype html><meta charset="utf-8"><title>Taşındı</title><meta http-equiv="refresh" content="0; url=../"><link rel="canonical" href="'+SITE_URL+'"><a href="../">Siteye git</a>')
+Path('404.html').write_text('<!doctype html><html lang="tr"><meta charset="utf-8"><title>Sayfa bulunamadı · Umut Köse</title><script>var p=location.pathname;if(p.indexOf("/dist/")>-1){location.replace(p.replace("/dist/","/")+location.hash);}</script><body style="font:16px/1.6 Arial,sans-serif;background:#f7f4eb;color:#203d35;padding:10vh 8%"><h1 style="font:400 48px Georgia,serif">Bu sayfa bulunamadı</h1><p><a href="'+SITE_URL+'">Ana sayfaya dön</a></p></body></html>')
