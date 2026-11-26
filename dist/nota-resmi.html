@@ -52,6 +52,8 @@ button,input{font:inherit;color:inherit}
 .btn.primary[aria-pressed="true"]{background:transparent;color:var(--text)}
 .btn.stop{border-color:#7a2f3a;color:#ffb3bd}
 .btn.stop:hover{border-color:#ff8090}
+.btn.stop.resume{border-color:#2f7a4a;color:#a8f0c0}
+.btn.stop.resume:hover{border-color:#6fe09a}
 .strings{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .label{color:var(--muted);font-size:12px;margin-right:2px}
 .str{
@@ -429,7 +431,7 @@ button,input{font:inherit;color:inherit}
 
   /* ============ Ses ============ */
   let ctx = null, analyser = null, input = null, micStream = null, micNode = null, fileSrc = null;
-  let live = false, sens = 2, mathSeq = null, hasMicNotes = false, lastConst = '';
+  let live = false, sens = 2, mathSeq = null, hasMicNotes = false, lastConst = '', paused = false;
   const voices = [];
   const timeBuf = new Float32Array(FFT);
   const freqBuf = new Float32Array(FFT / 2).fill(-120);
@@ -446,6 +448,8 @@ button,input{font:inherit;color:inherit}
       input = ctx.createGain(); input.gain.value = sens;
       input.connect(analyser);
     }
+    // Duraklatılmışken başka bir ses başlatılırsa duraklatılan bırakılır, yenisi baştan çalar
+    if (paused) { silenceVoices(); stopFile(); setPaused(false); }
     if (ctx.state === 'suspended') ctx.resume();
     live = true;
     if (example) { example = false; clearAll(); }   // örnek resmi kaldır, kullanıcının resmi başlasın
@@ -588,15 +592,23 @@ button,input{font:inherit;color:inherit}
     }
   }
 
-  // Durdur: çalan ve sıraya alınmış bütün örnek sesleri ve ses dosyasını keser. Mikrofona ve resme dokunmaz.
-  function stopAll() {
-    if (ctx) silenceVoices();
-    stopFile();
-    setStatus('Çalan ses durduruldu. Resmin olduğu gibi duruyor.');
+  /* Durdur / Devam ettir: ses saatini dondurur. Örnek ezgiler, matematik dizileri ve eklenen müzikler
+     tam kaldıkları yerde bekler; "Devam ettir" hepsini aynı noktadan sürdürür. Resme dokunmaz. */
+  const stopBtn = $('stopBtn');
+  function setPaused(p) {
+    paused = p;
+    stopBtn.textContent = p ? '▶ Devam ettir' : '■ Durdur';
+    stopBtn.classList.toggle('resume', p);
   }
-  $('stopBtn').addEventListener('click', stopAll);
+  function togglePause() {
+    if (paused) { ctx.resume(); setPaused(false); setStatus('Kaldığı yerden devam ediyor.'); return; }
+    if (!ctx || !(voices.length || mathSeq || fileSrc)) { setStatus('Şu an çalan bir ses yok.'); return; }
+    ctx.suspend(); setPaused(true);
+    setStatus('Duraklatıldı. "Devam ettir"e basınca kaldığı yerden sürer.' + (micStream ? ' Mikrofon da bu sırada bekliyor.' : ''));
+  }
+  stopBtn.addEventListener('click', togglePause);
   addEventListener('keydown', e => {
-    if (e.key === 'Escape') { stopAll(); return; }
+    if (e.key === 'Escape') { togglePause(); return; }
     if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
     const n = '654321'.indexOf(e.key);       // tel numarası: 6 = kalın Mi
     if (n >= 0) playString(STRINGS[n]);
@@ -856,8 +868,8 @@ button,input{font:inherit;color:inherit}
   function frame(now) {
     requestAnimationFrame(frame);
     if (!W || !H) return;
-    if (live) analyse(now);
-    if (mathSeq) stepMath(now);
+    if (live && !paused) analyse(now);
+    if (mathSeq && !paused) stepMath(now);
     if (paintDirty) repaint();
     if (panelDirty) updatePanel();
     updateLive(now);
