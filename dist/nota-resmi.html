@@ -71,6 +71,15 @@ button,input{font:inherit;color:inherit}
 .trk .x{border-radius:0 8px 8px 0;border-left:0;padding-left:7px;padding-right:7px;color:var(--muted)}
 .trk .x:hover{color:#ffb3bd}
 .spacer{flex:1 1 0}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;padding:3px;border:1px solid var(--rule);border-radius:16px;background:#0a0c14}
+.tabs button{border:0;background:transparent;border-radius:999px;padding:6px 13px;cursor:pointer;color:var(--muted);white-space:nowrap}
+.tabs button:hover{color:var(--text)}
+.tabs button[aria-selected="true"]{background:#1e2236;color:var(--text);font-weight:600}
+.pane{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:36px}
+.hint{color:var(--muted);font-size:12px;margin-left:6px}
+.help{margin:4px 0 0;color:var(--muted);font:400 12px/1.45 var(--ui)}
+.help summary{cursor:pointer}
+.palette{display:block;width:100%;height:12px;border-radius:3px;background:var(--stage);margin-top:3px}
 
 .work{display:grid;grid-template-columns:minmax(0,1fr) 356px;min-height:0}
 .stage{position:relative;min-height:0;min-width:0;overflow:hidden}
@@ -111,6 +120,7 @@ button,input{font:inherit;color:inherit}
 .fn .head{grid-column:1/-1;color:var(--text);font-weight:600;padding-bottom:5px;border-bottom:1px solid var(--rule)}
 .fn .out{color:var(--note)}
 .fn .wide{grid-column:1/-1}
+.fn .par{color:var(--muted);text-align:right}
 .fn dd.wide{font-size:13px}
 .desc{margin:10px 0 0;color:#c3c7da;font-size:13px;line-height:1.45}
 .legend{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:10px}
@@ -151,32 +161,44 @@ button,input{font:inherit;color:inherit}
 <header class="bar">
   <a class="home" href="./">← Umut Köse</a>
   <h1>Nota <b>Resmi</b></h1>
-  <button id="micBtn" class="btn primary" aria-pressed="false">Mikrofonu aç</button>
+  <div class="tabs" role="tablist" aria-label="Ses kaynağı">
+    <button role="tab" id="tab-live" aria-controls="pane-live" aria-selected="true">Canlı çal</button>
+    <button role="tab" id="tab-demo" aria-controls="pane-demo" aria-selected="false" tabindex="-1">Örnekler ve matematik</button>
+    <button role="tab" id="tab-music" aria-controls="pane-music" aria-selected="false" tabindex="-1">Müzik ekle</button>
+  </div>
+  <span class="spacer"></span>
   <button id="stopBtn" class="btn stop">■ Durdur</button>
-  <div class="strings" role="group" aria-label="Örnek sesler">
-    <span class="label">Örnek tel</span>
+  <button id="fsBtn" class="btn">Tam ekran</button>
+
+  <div class="pane" id="pane-live" role="tabpanel" aria-labelledby="tab-live">
+    <button id="micBtn" class="btn primary" aria-pressed="false">Mikrofonu aç</button>
+    <span class="label">ya da örnek bir tele bas</span>
     <button class="str" data-f="82.41">6 Mi</button>
     <button class="str" data-f="110.00">5 La</button>
     <button class="str" data-f="146.83">4 Re</button>
     <button class="str" data-f="196.00">3 Sol</button>
     <button class="str" data-f="246.94">2 Si</button>
     <button class="str" data-f="329.63">1 Mi</button>
-    <span class="label" style="margin-left:8px">Örnek ezgi</span>
+    <span class="hint">Klavyede 1–6</span>
+  </div>
+  <div class="pane" id="pane-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+    <span class="label">Örnek ezgi</span>
     <button class="str" id="melBtn">Melodi</button>
     <button class="str" id="chromBtn">Kromatik gam</button>
     <button class="str" id="improBtn">Doğaçlama</button>
-    <span class="label" style="margin-left:8px">Müziklerim</span>
-    <span id="tracks" class="tracks"></span>
-    <button class="str add" id="addMusicBtn" title="Bilgisayarından bir ya da birkaç ses dosyası seç">+ Müzik ekle</button>
-    <input type="file" id="fileInput" accept="audio/*" multiple hidden>
     <span class="label" style="margin-left:8px">Matematik çalsın</span>
     <button class="str math" data-const="e" title="e sayısının ilk 100 basamağı">e</button>
     <button class="str math" data-const="pi" title="π sayısının ilk 100 basamağı">π</button>
     <button class="str math" data-const="sqrt2" title="√2 sayısının ilk 100 basamağı">√2</button>
     <button class="str math" data-const="phi" title="Altın oranın ilk 100 basamağı">φ</button>
+    <span class="hint">Bir sayının basamakları ezgiye, ezgi resme dönüşür</span>
   </div>
-  <span class="spacer"></span>
-  <button id="fsBtn" class="btn">Tam ekran</button>
+  <div class="pane" id="pane-music" role="tabpanel" aria-labelledby="tab-music" hidden>
+    <span id="tracks" class="tracks"></span>
+    <button class="str add" id="addMusicBtn" title="Bilgisayarından bir ya da birkaç ses dosyası seç">+ Müzik ekle</button>
+    <input type="file" id="fileInput" accept="audio/*" multiple hidden>
+    <span class="hint">Dosyalar yalnızca bu tarayıcıda saklanır, hiçbir yere gönderilmez</span>
+  </div>
 </header>
 
 <div class="work">
@@ -200,6 +222,8 @@ button,input{font:inherit;color:inherit}
         <span class="live"><i id="liveSw"></i><span id="liveTxt">Şu an: sessiz</span></span>
         <span id="countTxt">Resim: 0 nota</span>
         <span id="covTxt">Ulaşılan renk hücresi: 0 / 4096</span>
+        <canvas id="palette" class="palette" aria-hidden="true"></canvas>
+        <details class="help"><summary>Bu sayaç ne?</summary>RGB renk küpü her kanalda 16 basamağa bölünürse 16 × 16 × 16 = 4096 hücre eder. Sayaç, resimdeki renklerin bu hücrelerden kaçına düştüğünü gösterir; şerit o renkleri tona göre dizer.</details>
       </div>
       </div>
     </section>
@@ -208,9 +232,10 @@ button,input{font:inherit;color:inherit}
       <dl class="fn">
         <div class="head">f(nota) = (R, G, B)</div>
         <dt>m = 69 + 12·log₂(f / 440)</dt><dd id="fnM">—</dd>
-        <dt>H = 30°·(m mod 12) + 7,5°·(m − 40)/12</dt><dd id="fnH">—</dd>
-        <dt>S = 1 − log₂(q) / 3</dt><dd id="fnS">—</dd>
-        <dt>V = (L + 42) / 30</dt><dd id="fnV">—</dd>
+        <dt>H = 30°·(m mod 12) + 6°·(m − 40)/12</dt><dd id="fnH">—</dd>
+        <dt>S = S₀ + (1 − S₀)·(1 − log₂(q)/3)</dt><dd id="fnS">—</dd>
+        <dt>V = (L − L₀) / (L₁ − L₀)</dt><dd id="fnV">—</dd>
+        <div class="wide par" id="fnPar">S₀ = 0,35 · L₀ = −42 dB · L₁ = −12 dB</div>
         <dt class="out wide">(R, G, B) = HSV→RGB(H, S, V)</dt><dd id="fnRGB" class="out wide">—</dd>
       </dl>
       <dl class="fn" style="margin-top:8px">
@@ -219,7 +244,7 @@ button,input{font:inherit;color:inherit}
         <dt>boyut a = 0,18 + 0,82·V</dt><dd id="fnA">—</dd>
         <dt>sivrilik p = 1 + 1,5·(1 − S)</dt><dd id="fnP">—</dd>
       </dl>
-      <p class="desc">Girdiler: f notanın frekansı (Hz), q tınının parlaklığı (sesin etkin frekansının f'ye oranı; saf sinüste 1), L vuruş anındaki ses seviyesi (dB). Nota adı ana tonu ve eğrinin yönünü, tını doygunluğu ve sivriliği, vuruş şiddeti parlaklığı ve boyutu belirler. S ve V, [0, 1] aralığına kırpılır.</p>
+      <p class="desc">Girdiler: f notanın frekansı (Hz), q tınının parlaklığı (sesin etkin frekansının f'ye oranı; saf sinüste 1), L vuruş anındaki ses seviyesi (dB). Nota adı ana tonu ve eğrinin yönünü, tını doygunluğu ve sivriliği, vuruş şiddeti parlaklığı ve boyutu belirler. Mikrofonda L₀ = −42 dB ve L₁ = −12 dB sabittir; eklenen müzikte parçanın kendi ses aralığına göre ayarlanır.</p>
       <div class="legend" id="legend" aria-label="Nota adına göre renk tonu"></div>
     </section>
 
@@ -253,7 +278,22 @@ button,input{font:inherit;color:inherit}
         <label class="check"><input type="checkbox" id="chkFill" checked> Eğrilerin içini saydam boya</label>
         <div class="row" id="capRow" hidden>
           <div class="top"><label for="sldCap">Tuval kapasitesi</label><output id="valCap">200 nota</output></div>
-          <input type="range" id="sldCap" min="50" max="2000" step="50" value="200">
+          <input type="range" id="sldCap" min="50" max="5000" step="50" value="200">
+          <p class="help">Tuvalin kaç notayla dolacağını belirler. Nota sayısı bunu aşarsa hiçbir nota silinmez; eğriler küçülür ve hepsi sığar.</p>
+        </div>
+        <div class="row">
+          <div class="top"><label for="sldSat">En düşük doygunluk S₀</label><output id="valSat">0,35</output></div>
+          <input type="range" id="sldSat" min="0" max="0.6" step="0.05" value="0.35">
+          <p class="help">Parlak tınılı notaların griye dönmesini önler. 0 seçilirse fonksiyon beyaz ve griler dahil tüm renklere ulaşabilir.</p>
+        </div>
+        <div class="row">
+          <div class="top"><label for="sldOnset">Vuruş eşiği</label><output id="valOnset">1,8×</output></div>
+          <input type="range" id="sldOnset" min="1.2" max="3" step="0.1" value="1.8">
+          <p class="help">Düşük değer hafif vuruşları da yakalar; yüksek değer uzayan bir notanın yeniden çizilmesini önler.</p>
+        </div>
+        <div class="row">
+          <div class="top"><label for="sldGap">En kısa nota aralığı</label><output id="valGap">130 ms</output></div>
+          <input type="range" id="sldGap" min="120" max="600" step="10" value="130">
         </div>
         <div class="row">
           <div class="top"><label for="sldSens">Mikrofon hassasiyeti</label><output id="valSens">2.0×</output></div>
@@ -269,6 +309,7 @@ button,input{font:inherit;color:inherit}
         <button class="btn" id="clearBtn">Temizle</button>
         <button class="btn" id="pngBtn">PNG indir</button>
       </div>
+      <label class="check" style="margin-top:10px"><input type="checkbox" id="chkTag" checked> PNG'ye künye ekle (ad, nota sayısı, renk şeridi)</label>
       <p class="desc">Şekli ya da yerleşimi değiştirmek resmi silmez; aynı notalar yeni kuralla baştan çizilir.</p>
     </section>
   </aside>
@@ -301,12 +342,15 @@ button,input{font:inherit;color:inherit}
   }
   // m: MIDI perde değeri (kesirli olabilir), L: ses seviyesi (dB)
   //    q: tını parlaklığı = etkin frekans / temel frekans (saf sinüste 1)
+  let satFloor = 0.35;              // S₀: doygunluğun inebileceği en düşük değer (0 seçilirse fonksiyon tüm renk küpünü örter)
+  let lvlLo = -42, lvlHi = -12;     // L₀, L₁: parlaklığın dB aralığı; eklenen müzikte parçanın kendi aralığına ayarlanır
+  const satOf = q => satFloor + (1 - satFloor) * clamp(1 - Math.log2(Math.max(q, 1)) / 3, 0, 1);
   function noteFn(m, L, q) {
-    // Nota adı ana tonu verir (Do = 0°, her yarım ses 30°); her oktav tonu 7,5° kaydırır,
-    // böylece gitarın 49 perdesinin her biri ayrı bir tona düşer.
-    const H = (30 * (((m % 12) + 12) % 12) + 7.5 * (m - 40) / 12 + 360) % 360;
-    const S = clamp(1 - Math.log2(Math.max(q, 1)) / 3, 0, 1);   // yumuşak tını doygun, parlak tını soluk
-    const V = clamp((L + 42) / 30, 0, 1);                        // −42 dB siyah, −12 dB ve üstü tam parlak
+    // Nota adı ana tonu verir (Do = 0°, her yarım ses 30°); her oktav tonu 6° kaydırır.
+    // Dört oktavda kayma 24° eder, 30°'lik komşu nota adımına ulaşmaz: gitarın 49 perdesi 49 ayrı tona düşer.
+    const H = (30 * (((m % 12) + 12) % 12) + 6 * (m - 40) / 12 + 360) % 360;
+    const S = satOf(q);                                           // yumuşak tını doygun, parlak tını S₀'a kadar solar
+    const V = clamp((L - lvlLo) / (lvlHi - lvlLo), 0, 1);         // L₀ siyah, L₁ ve üstü tam parlak
     return { H, S, V, c: hsv2rgb(H, S, V) };
   }
   function noteName(m) {
@@ -314,7 +358,7 @@ button,input{font:inherit;color:inherit}
     return `${TR[pc]}${Math.floor(n / 12) - 1} (${EN[pc]}${Math.floor(n / 12) - 1})`;
   }
 
-  $('legend').innerHTML = TR.map((n, i) => `<span style="--c:rgb(${hsv2rgb(i * 30 + 7.5, 0.85, 1)})">${n}</span>`).join('');
+  $('legend').innerHTML = TR.map((n, i) => `<span style="--c:rgb(${hsv2rgb(i * 30 + 9, 0.85, 1)})">${n}</span>`).join('');
   document.querySelectorAll('.str[data-f]').forEach(b => {
     b.style.setProperty('--c', `rgb(${noteFn(midiOf(+b.dataset.f), -12, 1.25).c})`);
   });
@@ -360,7 +404,11 @@ button,input{font:inherit;color:inherit}
     if (!paintDirty && W && (layout === 'mandala' || notes.length <= cap)) drawNote(g, n, notes.length - 1, Math.max(cap, notes.length), false);
     else paintDirty = true;
   }
-  function clearAll() { notes.length = 0; recount(); panelDirty = true; paintDirty = true; hasMicNotes = false; lastConst = ''; }
+  function recolor() {
+    for (const n of notes) { n.S = satOf(n.q); n.c = hsv2rgb(n.H, n.S, n.V); }
+    recount(); panelDirty = true; paintDirty = true;
+  }
+  function clearAll() { notes.length = 0; recount(); panelDirty = true; paintDirty = true; hasMicNotes = false; lastConst = ''; picTitle = ''; }
 
   // Notanın eğrisi: birim boyutta, başlangıç noktasına göre. Yön φ = H, sivrilik p = 1 + 1,5·(1 − S).
   const SN = 220, SX = new Float32Array(SN + 1), SY = new Float32Array(SN + 1);
@@ -431,7 +479,7 @@ button,input{font:inherit;color:inherit}
 
   /* ============ Ses ============ */
   let ctx = null, analyser = null, input = null, micStream = null, micNode = null, fileSrc = null;
-  let live = false, sens = 2, mathSeq = null, hasMicNotes = false, lastConst = '', paused = false;
+  let live = false, sens = 2, mathSeq = null, hasMicNotes = false, lastConst = '', picTitle = '', paused = false, onsetRatio = 1.8, minGap = 130;
   const voices = [];
   const timeBuf = new Float32Array(FFT);
   const freqBuf = new Float32Array(FFT / 2).fill(-120);
@@ -489,8 +537,9 @@ button,input{font:inherit;color:inherit}
   micBtn.addEventListener('click', toggleMic);
 
   // Örnek tel: Karplus-Strong. vel vuruş şiddeti (0–1), stopAfter verilirse nota o kadar saniye sonra susar.
+  function resetLevels() { if (lvlLo !== -42 || lvlHi !== -12) { lvlLo = -42; lvlHi = -12; panelDirty = true; } }
   function silenceVoices() {
-    mathSeq = null;
+    mathSeq = null; resetLevels();
     const t = ctx.currentTime;
     for (const v of voices.splice(0)) {
       v.g1.gain.cancelScheduledValues(t); v.g2.gain.cancelScheduledValues(t);
@@ -574,7 +623,7 @@ button,input{font:inherit;color:inherit}
       pluck(freqOf(m), t0 + i * step - ctx.currentTime, V, step, 0.2, 0.6 * d2 / 9);
     }
     mathSeq = { key, list, t0, i: 0, kept };
-    if (!kept) lastConst = key;
+    if (!kept) { lastConst = key; picTitle = `${CONSTS[key].name} sayısının ilk ${list.length} basamağı`; }
     setStatus(`${CONSTS[key].name} çalıyor…`);
   }
   document.querySelectorAll('.str[data-const]').forEach(b => b.addEventListener('click', () => playConst(b.dataset.const)));
@@ -653,8 +702,23 @@ button,input{font:inherit;color:inherit}
     }
   }
   function stopFile() {
-    if (fileSrc) { try { fileSrc.stop(); } catch (_) {} fileSrc = null; }
+    if (fileSrc) { try { fileSrc.stop(); } catch (_) {} fileSrc = null; resetLevels(); }
     if (playingId !== null) { playingId = null; renderTracks(); }
+  }
+  // Parçanın kendi ses aralığı: 512 örneklik pencerelerin dB dağılımında %5 ve %99 noktaları.
+  // Sıkıştırılmış bir kayıt sabit −42…−12 dB aralığında hep tavana yapışır; bu ölçek dinamiğini geri açar.
+  function levelRange(buf) {
+    const n = buf.length, a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : null, vals = [];
+    for (let i = 0; i + 512 <= n; i += 2048) {
+      let e = 0;
+      for (let j = i; j < i + 512; j++) { const v = b ? 0.5 * (a[j] + b[j]) : a[j]; e += v * v; }
+      const d = 10 * Math.log10(e / 512 + 1e-12);
+      if (d > -44) vals.push(d);
+    }
+    if (vals.length < 20) return [-42, -12];
+    vals.sort((x, y) => x - y);
+    const lo = vals[Math.floor(vals.length * 0.05)], hi = vals[Math.floor(vals.length * 0.99)];
+    return hi - lo < 8 ? [hi - 16, hi] : [lo, hi];
   }
   async function playTrack(t) {
     if (!ensureAudio()) return;
@@ -664,11 +728,13 @@ button,input{font:inherit;color:inherit}
       stopFile(); silenceVoices();
       const kept = hasMicNotes;
       if (!kept) clearAll();           // her müzik kendi resmini çizsin; mikrofonla çizdiğin resim varsa korunur
+      [lvlLo, lvlHi] = levelRange(buf); panelDirty = true;
       const src = ctx.createBufferSource(); src.buffer = buf;
       const tap = ctx.createGain(); tap.gain.value = 1 / sens;
       src.connect(ctx.destination); src.connect(tap); tap.connect(input);
       src.onended = () => { if (fileSrc === src) { stopFile(); setStatus(`${t.name} bitti: resmi tamam (${notes.length} eğri).`); } };
       src.start(); fileSrc = src; playingId = t.id;
+      if (!kept) picTitle = t.name;
       if (!kept) lastConst = t.name.toLowerCase().replace(/[^a-z0-9ğüşöçı]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
       renderTracks();
       setStatus('Çalıyor: ' + t.name + (kept ? ' (mevcut resminin üstüne çiziliyor)' : ''));
@@ -707,6 +773,21 @@ button,input{font:inherit;color:inherit}
     const all = await store('readonly', s => s.getAll());
     if (Array.isArray(all)) { for (const r of all) tracks.push({ id: r.id, name: r.name, blob: r.blob }); renderTracks(); }
   })();
+
+  // Sekmeler: bir anda tek ses kaynağı grubu görünür
+  const tabs = Array.from(document.querySelectorAll('.tabs [role=tab]'));
+  function selectTab(t, focus) {
+    tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; $(x.getAttribute('aria-controls')).hidden = !on; });
+    if (focus) t.focus();
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => selectTab(t));
+    t.addEventListener('keydown', e => {
+      const j = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
+      if (j === null) return;
+      e.preventDefault(); selectTab(tabs[(j + tabs.length) % tabs.length], true);
+    });
+  });
 
   const fsBtn = $('fsBtn');
   if (!document.documentElement.requestFullscreen) fsBtn.hidden = true;
@@ -786,7 +867,7 @@ button,input{font:inherit;color:inherit}
     if (mathSeq) { pend = null; candSince = 0; return; }
 
     // Vuruş: kısa pencere enerjisi, yavaş zarfın belirgin üstüne çıkarsa
-    const onset = rmsShort > Math.max(GATE * 2.5, envSlow * 1.8) && now - lastOnset > 130;
+    const onset = rmsShort > Math.max(GATE * 2.5, envSlow * onsetRatio) && now - lastOnset > minGap;
     envSlow = envSlow * 0.86 + rmsShort * 0.14;
     if (onset) { pend = { t: now, peak: rmsShort, ps: [] }; lastOnset = now; }
 
@@ -825,8 +906,20 @@ button,input{font:inherit;color:inherit}
   const el = { sw: $('swatch'), rgb: $('rgbTxt'), hex: $('hexTxt'), note: $('noteTxt'), count: $('countTxt'), cov: $('covTxt'),
                liveSw: $('liveSw'), live: $('liveTxt'), phi: $('fnPhi'), a: $('fnA'), p: $('fnP'), m: $('fnM'), h: $('fnH'), s: $('fnS'), v: $('fnV'), out: $('fnRGB') };
   const tr = (x, d) => x.toFixed(d).replace('.', ',');
+  // Resimdeki renkler, tona (sonra parlaklığa) göre dizilmiş ince bir şerit olarak
+  function paintPalette(c2, x, y, w, h) {
+    c2.fillStyle = `rgb(${BG})`; c2.fillRect(x, y, w, h);
+    if (!notes.length) return;
+    const srt = notes.slice().sort((a, b) => a.H - b.H || a.V - b.V), cw = w / srt.length;
+    for (let i = 0; i < srt.length; i++) { c2.fillStyle = `rgb(${srt[i].c})`; c2.fillRect(x + i * cw, y, Math.ceil(cw), h); }
+  }
+  const pal = $('palette');
   function updatePanel() {
     panelDirty = false;
+    const pw = Math.max(1, Math.round(pal.clientWidth * dpr)), ph = Math.max(1, Math.round(pal.clientHeight * dpr));
+    if (pal.width !== pw || pal.height !== ph) { pal.width = pw; pal.height = ph; }
+    paintPalette(pal.getContext('2d'), 0, 0, pw, ph);
+    $('fnPar').textContent = `S₀ = ${tr(satFloor, 2)} · L₀ = ${tr(lvlLo, 0).replace('-', '−')} dB · L₁ = ${tr(lvlHi, 0).replace('-', '−')} dB`;
     const n = notes[notes.length - 1];
     el.count.textContent = `Resim: ${notes.length} nota` + (example ? ' (örnek)' : '');
     el.cov.textContent = `Ulaşılan renk hücresi: ${covN} / 4096`;
@@ -884,8 +977,8 @@ button,input{font:inherit;color:inherit}
       ga.font = '600 11px "JetBrains Mono", ui-monospace, Consolas, monospace';
       ga.textAlign = 'center'; ga.textBaseline = 'middle';
       for (let pc = 0; pc < 12; pc++) {
-        const ang = (pc * 30 + 7.5) * Math.PI / 180, r = unit + 16;
-        ga.fillStyle = `rgba(${hsv2rgb(pc * 30 + 7.5, 0.8, 1)},.9)`;
+        const ang = (pc * 30 + 9) * Math.PI / 180, r = unit + 16;
+        ga.fillStyle = `rgba(${hsv2rgb(pc * 30 + 9, 0.8, 1)},.9)`;
         ga.fillText(TR[pc], cx0 + r * Math.cos(ang), cy0 - r * Math.sin(ang));
       }
     } else if (!example) {
@@ -920,6 +1013,9 @@ button,input{font:inherit;color:inherit}
   document.querySelectorAll('#shapeBtns .mode').forEach(b => b.addEventListener('click', () => setShape(b.dataset.shape)));
   document.querySelectorAll('#layoutBtns .mode').forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
   $('chkFill').addEventListener('change', e => { fillOn = e.target.checked; paintDirty = true; });
+  $('sldSat').addEventListener('input', e => { satFloor = +e.target.value; $('valSat').textContent = tr(satFloor, 2); recolor(); });
+  $('sldOnset').addEventListener('input', e => { onsetRatio = +e.target.value; $('valOnset').textContent = tr(onsetRatio, 1) + '×'; });
+  $('sldGap').addEventListener('input', e => { minGap = +e.target.value; $('valGap').textContent = minGap + ' ms'; });
   $('sldCap').addEventListener('input', e => { cap = +e.target.value; $('valCap').textContent = cap + ' nota'; paintDirty = true; });
   $('sldSens').addEventListener('input', e => { sens = +e.target.value; if (input) input.gain.value = sens; $('valSens').textContent = sens.toFixed(1) + '×'; });
 
@@ -931,11 +1027,28 @@ button,input{font:inherit;color:inherit}
   $('pngBtn').addEventListener('click', () => {
     try {
       if (paintDirty) repaint();
+      // Künye: resmin altına ad, nota sayısı, şekil ve renk şeridi basılır
+      const tag = $('chkTag').checked, band = tag ? Math.round(96 * dpr) : 0;
+      const out = document.createElement('canvas'); out.width = fx.width; out.height = fx.height + band;
+      const x = out.getContext('2d'); x.drawImage(fx, 0, 0);
+      if (tag) {
+        const y0 = fx.height, pad = 24 * dpr;
+        x.fillStyle = '#0e1019'; x.fillRect(0, y0, out.width, band);
+        paintPalette(x, 0, y0, out.width, Math.round(10 * dpr));
+        x.textBaseline = 'alphabetic'; x.textAlign = 'left';
+        x.fillStyle = '#eceef8'; x.font = `600 ${22 * dpr}px "Unbounded", "Segoe UI", sans-serif`;
+        x.fillText(picTitle || 'Nota Resmi', pad, y0 + 50 * dpr, out.width * 0.62);
+        const label = sel => document.querySelector(sel).textContent.trim();
+        x.fillStyle = '#8b90a9'; x.font = `${13 * dpr}px "JetBrains Mono", ui-monospace, Consolas, monospace`;
+        x.fillText(`${notes.length} nota · ${label(`[data-shape="${shape}"]`)} · ${label(`[data-layout="${layout}"]`)} · ${covN} / 4096 renk hücresi`, pad, y0 + 76 * dpr, out.width - 2 * pad);
+        x.textAlign = 'right';
+        x.fillText('Nota Resmi · ' + new Date().toLocaleDateString('tr-TR'), out.width - pad, y0 + 50 * dpr);
+      }
       const a = document.createElement('a');
       a.download = `nota-resmi-${lastConst ? lastConst + '-' : ''}${shape}-${new Date().toISOString().slice(0, 10)}.png`;
-      a.href = fx.toDataURL('image/png');
+      a.href = out.toDataURL('image/png');
       document.body.appendChild(a); a.click(); a.remove();
-      setStatus(`PNG hazırlandı (${fx.width}×${fx.height}, ${notes.length} nota).`);
+      setStatus(`PNG hazırlandı (${out.width}×${out.height}, ${notes.length} nota${tag ? ', künyeli' : ''}).`);
     } catch (_) { setStatus('PNG oluşturulamadı. Dosyayı tarayıcıda açıp yeniden dene.', true); }
   });
 
