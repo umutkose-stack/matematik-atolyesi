@@ -254,10 +254,13 @@ button,input{font:inherit;color:inherit}
       <h2>Şekil</h2>
       <div class="modes" id="shapeBtns">
         <button class="mode" data-shape="cardioid" aria-pressed="true">Kardioid</button>
+        <button class="mode" data-shape="limacon" aria-pressed="false">Limaçon</button>
         <button class="mode" data-shape="rose" aria-pressed="false">Yaprak</button>
         <button class="mode" data-shape="epi" aria-pressed="false">Episikloid</button>
         <button class="mode" data-shape="lemniscate" aria-pressed="false">Lemniskat</button>
         <button class="mode" data-shape="ellipse" aria-pressed="false">Halka</button>
+        <button class="mode" data-shape="super" aria-pressed="false">Süperformül</button>
+        <button class="mode" data-shape="maurer" aria-pressed="false">Maurer gülü</button>
         <button class="mode" data-shape="fourier" aria-pressed="false">Fourier</button>
         <button class="mode" data-shape="mixed" aria-pressed="false">Karışık</button>
       </div>
@@ -384,12 +387,19 @@ button,input{font:inherit;color:inherit}
       desc: 'Her nota φ yönünde yatan bir lemniskat (sekiz) çizer; doygunluk halkaların genişliğini belirler.' },
     ellipse: { eq: '(x, y) = a · (cos t, b·sin t),   b = 0,35 + 0,65·S',
       desc: 'Her nota φ yönünde yatan bir halka çizer; tam doygun notada halka çemberdir, tını parlaklaştıkça basıklaşır.' },
+    limacon: { eq: 'r(θ) = a · (b + cos(θ − φ)) / (b + 1),   b = 0,45 + 0,55·τ,   τ = 1 − log₂(q)/3',
+      desc: 'Kardioidin ailesi. Yumuşak tınıda b = 1 olur ve eğri tam kardioiddir; tını parlaklaştıkça b küçülür ve sivri uç bir iç ilmeğe açılır.' },
+    super: { eq: 'r(θ) = (|cos(m·θ/4)|^n + |sin(m·θ/4)|^n)^(−1/n₁),   m = nota sırası + 2',
+      desc: 'Gielis süperformülü. Köşe sayısı m nota adından gelir (Do 2, Do♯ 3, … Si 13). Yumuşak tınıda yuvarlak köşeli bir m-gen (n = 1,5 · n₁ = 1), tını parlaklaştıkça sivri bir yıldız olur (n = 1 · n₁ = 0,35).' },
+    maurer: { eq: 'Pₖ = sin(n·k·d°) · e^(i·k·d°),  k = 0…360   ·   n = 2 + (nota sırası mod 6),   d = 29, 31, 37, 47, 71 (oktava göre)',
+      desc: 'n yapraklı gülün üzerindeki 361 nokta d derecelik adımlarla doğru parçalarıyla birleştirilir. Yaprak sayısı nota adından, adım oktavdan gelir. Çizgi ağı olduğu için içi boyanmaz.' },
     fourier: { eq: 'z(t) = Σ cₖ · e^(i·k·t),   k = 1…8,   cₖ = notanın k. armoniği (genlik ve faz)',
       desc: 'Her nota kendi tınısını çizer: eğri, sesin ölçülen ilk 8 armoniğinin toplamıdır, yani dalga biçiminin karmaşık düzlemdeki yörüngesi. Saf sinüs çember verir; armonikler güçlendikçe çembere ilmekler ve girintiler eklenir. Aynı nota farklı yerden ya da farklı çalgıyla çalınınca şekil değişir.' },
-    mixed: { eq: 'şekil = nota adına göre: Do, Mi, Sol♯ → kardioid · Do♯, Fa, La → yaprak · …',
-      desc: 'Şekil türü nota adından seçilir (nota mod 5): kardioid, yaprak, episikloid, lemniskat, halka. Tek resimde beş eğri ailesi birlikte görünür.' }
+    mixed: { eq: 'şekil = nota numarası mod 7: kardioid · yaprak · episikloid · lemniskat · halka · limaçon · süperformül',
+      desc: 'Şekil türü notanın numarasından seçilir (mod 7). Tek resimde yedi eğri ailesi birlikte görünür.' }
   };
-  const KINDS = ['cardioid', 'rose', 'epi', 'lemniscate', 'ellipse'];
+  const KINDS = ['cardioid', 'rose', 'epi', 'lemniscate', 'ellipse', 'limacon', 'super'];
+  const MAURER_D = [29, 31, 37, 47, 71];
   const LAYOUTS = {
     mandala: 'Bütün eğriler tuvalin merkezinden çıkar. Yön renk tonuyla aynı açıdır, bu yüzden renk çemberi resmin etrafına dizilir; sert vuruşlar dışa, yumuşak vuruşlar içe çizer.',
     spiral: 'Her nota, çalınma sırasıyla merkezden dışa sarılan spiralde kendi küçük eğrisini çizer; ezgi spirali izleyerek okunur.',
@@ -427,9 +437,20 @@ button,input{font:inherit;color:inherit}
   const SN = 360, SX = new Float32Array(SN + 1), SY = new Float32Array(SN + 1), FX = new Float32Array(SN + 1), FY = new Float32Array(SN + 1);
   function shapePath(n) {
     const phi = n.H * Math.PI / 180, p = 1 + 1.5 * (1 - n.S), oct = clamp(Math.floor((n.m - 40) / 12), 0, 4);
-    const kind = shape === 'mixed' ? KINDS[((Math.round(n.m) % 5) + 5) % 5] : shape;
+    const kind = shape === 'mixed' ? KINDS[((Math.round(n.m) % 7) + 7) % 7] : shape;
     const c = Math.cos(phi), s = Math.sin(phi);
+    const tq = clamp(1 - Math.log2(Math.max(n.q, 1)) / 3, 0, 1);       // tını yumuşaklığı: 1 saf, 0 çok parlak
+    const pc = ((Math.round(n.m) % 12) + 12) % 12;
     let fmax = 1;
+    if (kind === 'super') {
+      // Süperformül: yumuşak tınıda n = 1,5 ve n₁ = 1 (yuvarlak köşeli çokgen), parlak tınıda n = 1 ve n₁ = 0,35 (sivri yıldız)
+      const mm = pc + 2, n1 = 0.35 + 0.65 * tq, nn = 1 + 0.5 * tq; fmax = 1e-9;
+      for (let i = 0; i <= SN; i++) {
+        const t = i / SN * Math.PI * 2, u = mm * t / 4;
+        const r = Math.pow(Math.pow(Math.abs(Math.cos(u)), nn) + Math.pow(Math.abs(Math.sin(u)), nn), -1 / n1);
+        FX[i] = r * Math.cos(t); FY[i] = r * Math.sin(t); if (r > fmax) fmax = r;
+      }
+    }
     if (kind === 'fourier') {
       // z(t) = Σ cₖ·e^(ikt): armoniklerin toplamı. Sonra en uzak nokta 1 olacak biçimde ölçeklenir.
       const re = n.h.re, im = n.h.im; fmax = 1e-9;
@@ -443,6 +464,9 @@ button,input{font:inherit;color:inherit}
       const t = i / SN * Math.PI * 2;
       let x, y;
       if (kind === 'fourier') { x = 0.5 + 0.5 * FX[i] / fmax; y = 0.5 * FY[i] / fmax; }   // merkeze değen, φ yönünde uzanan halka
+      else if (kind === 'super') { x = 0.5 + 0.5 * FX[i] / fmax; y = 0.5 * FY[i] / fmax; }   // merkeze değen, φ yönünde duran yıldız
+      else if (kind === 'limacon') { const b = 0.45 + 0.55 * tq, r = (b + Math.cos(t)) / (b + 1); x = r * Math.cos(t); y = r * Math.sin(t); }
+      else if (kind === 'maurer') { const th = i * MAURER_D[oct] * Math.PI / 180, r = Math.sin((2 + pc % 6) * th); x = r * Math.cos(th); y = r * Math.sin(th); }
       else if (kind === 'cardioid') { const r = Math.pow((1 + Math.cos(t)) / 2, p); x = r * Math.cos(t); y = r * Math.sin(t); }
       else if (kind === 'rose') { const r = Math.pow(Math.abs(Math.cos((3 + oct) * t / 2)), p); x = r * Math.cos(t); y = r * Math.sin(t); }
       else if (kind === 'epi') { const k = 1 + oct; x = ((k + 1) * Math.cos(t) - Math.cos((k + 1) * t)) / (k + 2); y = ((k + 1) * Math.sin(t) - Math.sin((k + 1) * t)) / (k + 2); }
@@ -450,6 +474,7 @@ button,input{font:inherit;color:inherit}
       else { x = Math.cos(t); y = (0.35 + 0.65 * n.S) * Math.sin(t); }
       SX[i] = x * c - y * s; SY[i] = x * s + y * c;
     }
+    return kind;
   }
   // i. notanın eğrisinin başlangıç noktası ve boyutu (birim koordinat): [x, y, a]
   const A = [0, 0, 0];
@@ -479,18 +504,19 @@ button,input{font:inherit;color:inherit}
   // Bir notanın eğrisini çizer. glow verilirse (0–1) yalnızca parlak bir kontur çizilir (yeni nota vurgusu).
   function drawNote(c2, n, i, N, glow) {
     const a0 = anchor(i, N, n), ox = cx0 + a0[0] * unit, oy = cy0 - a0[1] * unit, a = a0[2] * unit;
-    shapePath(n);
+    const kind = shapePath(n);
     c2.setTransform(dpr, 0, 0, dpr, 0, 0);
     c2.beginPath();
     for (let k = 0; k <= SN; k++) { const x = ox + SX[k] * a, y = oy - SY[k] * a; k ? c2.lineTo(x, y) : c2.moveTo(x, y); }
     c2.closePath();
     c2.lineJoin = 'round';
-    const lw = clamp(a * 0.011, 1, 3.2) * (0.7 + 0.5 * n.V);
+    const mesh = kind === 'maurer';   // çizgi ağı: ince çizgi, dolgu yok
+    const lw = mesh ? clamp(a * 0.003, 0.5, 1) : clamp(a * 0.011, 1, 3.2) * (0.7 + 0.5 * n.V);
     if (glow) {
       c2.strokeStyle = `rgba(255,255,255,${(glow * 0.9).toFixed(2)})`; c2.lineWidth = lw + 2.5 * glow; c2.stroke();
     } else {
-      if (fillOn) { c2.fillStyle = `rgba(${n.c},0.13)`; c2.fill(); }
-      c2.strokeStyle = `rgba(${n.c},0.95)`; c2.lineWidth = lw; c2.stroke();
+      if (fillOn && !mesh) { c2.fillStyle = `rgba(${n.c},0.13)`; c2.fill(); }
+      c2.strokeStyle = `rgba(${n.c},${mesh ? 0.6 : 0.95})`; c2.lineWidth = lw; c2.stroke();
     }
   }
   function repaint() {
