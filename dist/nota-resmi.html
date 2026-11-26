@@ -77,6 +77,9 @@ button,input{font:inherit;color:inherit}
 .tabs button[aria-selected="true"]{background:#1e2236;color:var(--text);font-weight:600}
 .pane{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:36px}
 .hint{color:var(--muted);font-size:12px;margin-left:6px}
+.fld{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;white-space:nowrap}
+.fld input,.fld select{background:#0a0c14;color:var(--text);border:1px solid var(--rule);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
+.fld input{width:170px}
 .help{margin:4px 0 0;color:var(--muted);font:400 12px/1.45 var(--ui)}
 .help summary{cursor:pointer}
 .palette{display:block;width:100%;height:12px;border-radius:3px;background:var(--stage);margin-top:3px}
@@ -165,6 +168,7 @@ button,input{font:inherit;color:inherit}
     <button role="tab" id="tab-live" aria-controls="pane-live" aria-selected="true">Canlı çal</button>
     <button role="tab" id="tab-demo" aria-controls="pane-demo" aria-selected="false" tabindex="-1">Örnekler ve matematik</button>
     <button role="tab" id="tab-music" aria-controls="pane-music" aria-selected="false" tabindex="-1">Müzik ekle</button>
+    <button role="tab" id="tab-order" aria-controls="pane-order" aria-selected="false" tabindex="-1">Sipariş</button>
   </div>
   <span class="spacer"></span>
   <button id="stopBtn" class="btn stop">■ Durdur</button>
@@ -198,6 +202,19 @@ button,input{font:inherit;color:inherit}
     <button class="str add" id="addMusicBtn" title="Bilgisayarından bir ya da birkaç ses dosyası seç">+ Müzik ekle</button>
     <input type="file" id="fileInput" accept="audio/*" multiple hidden>
     <span class="hint">Dosyalar yalnızca bu tarayıcıda saklanır, hiçbir yere gönderilmez</span>
+  </div>
+  <div class="pane" id="pane-order" role="tabpanel" aria-labelledby="tab-order" hidden>
+    <button class="str add" id="ordFileBtn" title="Kayıt çalınmadan çözümlenir ve resme dönüşür">Ses dosyası seç</button>
+    <input type="file" id="ordFile" accept="audio/*,video/mp4,video/quicktime,video/webm" hidden>
+    <label class="fld">Nota <select id="ordCount"><option>150</option><option selected>300</option><option>600</option><option>1000</option></select></label>
+    <label class="fld">Başlık <input type="text" id="ordTitle" maxlength="60" placeholder="Our First Dance"></label>
+    <label class="fld">Alt satır <input type="text" id="ordSub" maxlength="80" placeholder="Elif &amp; Can · 14.06.2025"></label>
+    <label class="fld">Boyut <select id="ordSize">
+      <option value="a4">A4</option><option value="a3" selected>A3</option><option value="in8x10">8×10 inç</option>
+      <option value="in16x20">16×20 inç</option><option value="cm50x70">50×70 cm</option><option value="sq30">30×30 cm</option></select></label>
+    <label class="fld">Zemin <select id="ordBg"><option value="dark">Koyu</option><option value="light">Açık</option></select></label>
+    <button class="btn" id="ordPrint">Baskı dosyası indir</button>
+    <span class="hint">Kayıt çalınmaz; aynı dosya ve ayar her zaman aynı resmi verir</span>
   </div>
 </header>
 
@@ -501,10 +518,14 @@ button,input{font:inherit;color:inherit}
   }
   new ResizeObserver(resize).observe(stage);
 
+  // Açık zeminli baskıda renk siyaha değil kâğıda doğru solar: sessiz nota kâğıda karışır, ton ve doygunluk aynı kalır.
+  let inkBg = null;
+  function inkOf(n) { const c = hsv2rgb(n.H, n.S, 0.8), v = 0.3 + 0.7 * n.V; return c.map((ci, i) => Math.round(inkBg[i] + (ci - inkBg[i]) * v)); }
   // Bir notanın eğrisini çizer. glow verilirse (0–1) yalnızca parlak bir kontur çizilir (yeni nota vurgusu).
   function drawNote(c2, n, i, N, glow) {
     const a0 = anchor(i, N, n), ox = cx0 + a0[0] * unit, oy = cy0 - a0[1] * unit, a = a0[2] * unit;
     const kind = shapePath(n);
+    const col = inkBg ? inkOf(n) : n.c;
     c2.setTransform(dpr, 0, 0, dpr, 0, 0);
     c2.beginPath();
     for (let k = 0; k <= SN; k++) { const x = ox + SX[k] * a, y = oy - SY[k] * a; k ? c2.lineTo(x, y) : c2.moveTo(x, y); }
@@ -519,8 +540,8 @@ button,input{font:inherit;color:inherit}
       else { c2.strokeStyle = `rgba(255,255,255,${(glow * 0.9).toFixed(2)})`; c2.lineWidth = lw + 2.5 * glow; }
       c2.stroke();
     } else {
-      if (fillOn && !mesh) { c2.fillStyle = `rgba(${n.c},0.13)`; c2.fill(); }
-      c2.strokeStyle = `rgba(${n.c},${mesh ? 0.6 : 0.95})`; c2.lineWidth = lw; c2.stroke();
+      if (fillOn && !mesh) { c2.fillStyle = `rgba(${col},0.13)`; c2.fill(); }
+      c2.strokeStyle = `rgba(${col},${mesh ? 0.6 : 0.95})`; c2.lineWidth = lw; c2.stroke();
     }
   }
   function repaint() {
@@ -832,6 +853,7 @@ button,input{font:inherit;color:inherit}
   })();
 
   // Sekmeler: bir anda tek ses kaynağı grubu görünür
+  if (!/siparis/i.test(location.search + location.hash)) $('tab-order').remove();
   const tabs = Array.from(document.querySelectorAll('.tabs [role=tab]'));
   function selectTab(t, focus) {
     tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; $(x.getAttribute('aria-controls')).hidden = !on; });
@@ -1221,7 +1243,211 @@ button,input{font:inherit;color:inherit}
     } catch (_) { setStatus('PNG oluşturulamadı. Dosyayı tarayıcıda açıp yeniden dene.', true); }
   });
 
-  window.notaResmi = { notes, log: dbgLog };   // sınama ve merak için: çizilen notaların listesi
+  /* ============ Sipariş modu: dinlemeden çözümle, baskılık çıkar ============ */
+  // Kayıt çalınmaz. Her 93 ms'de bir 0,37 saniyelik pencerenin spektrumu yarım ses kutularına dağıtılır ve
+  // oktavlar üst üste katlanarak 12 nota adının enerjisi bulunur. Bir nota adının enerjisi belirgin biçimde
+  // arttığı an "nota" sayılır; en güçlü N tanesi çalındıkları sırayla çizilir.
+  // Hiçbir yerde rastgelelik yoktur: aynı dosya ve aynı ayar her zaman aynı resmi verir.
+  const OFS = 44100, ON = 16384, OHOP = 4096, M0 = 40, NSEMI = 49, ODF = OFS / ON;
+  let fftRev = null, fftCos, fftSin, fftWin, fRe, fIm, semiOf, bLo, bHi;
+  function fftInit() {
+    if (fftRev) return;
+    const bits = Math.log2(ON);
+    fftRev = new Uint32Array(ON); fftCos = new Float64Array(ON / 2); fftSin = new Float64Array(ON / 2);
+    fftWin = new Float32Array(ON); fRe = new Float64Array(ON); fIm = new Float64Array(ON);
+    for (let i = 0; i < ON; i++) {
+      let r = 0; for (let b = 0; b < bits; b++) r |= ((i >> b) & 1) << (bits - 1 - b);
+      fftRev[i] = r; fftWin[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / ON);
+    }
+    for (let i = 0; i < ON / 2; i++) { fftCos[i] = Math.cos(2 * Math.PI * i / ON); fftSin[i] = Math.sin(2 * Math.PI * i / ON); }
+    // Her frekans kutusunun düştüğü yarım ses (Mi2–Mi6 dışı: -1). Daha tizde perde değil hışırtı ve armonik ağır basar.
+    semiOf = new Int16Array(ON / 2).fill(-1);
+    bLo = Math.ceil(freqOf(M0 - 0.5) / ODF); bHi = Math.min(ON / 2, Math.floor(freqOf(M0 + NSEMI - 0.5) / ODF));
+    for (let b = bLo; b < bHi; b++) { const s = Math.round(midiOf(b * ODF)) - M0; if (s >= 0 && s < NSEMI) semiOf[b] = s; }
+  }
+  // x'in pos'tan başlayan penceresinin güç spektrumu
+  function powerSpec(x, pos, P) {
+    for (let i = 0; i < ON; i++) { const j = fftRev[i]; fRe[j] = (pos + i < x.length ? x[pos + i] : 0) * fftWin[i]; fIm[j] = 0; }
+    for (let len = 2; len <= ON; len <<= 1) {
+      const half = len >> 1, step = ON / len;
+      for (let i = 0; i < ON; i += len) for (let k = 0, t = 0; k < half; k++, t += step) {
+        const c = fftCos[t], s = fftSin[t], a = i + k, b = a + half;
+        const xr = fRe[b] * c + fIm[b] * s, xi = fIm[b] * c - fRe[b] * s;
+        fRe[b] = fRe[a] - xr; fIm[b] = fIm[a] - xi; fRe[a] += xr; fIm[a] += xi;
+      }
+    }
+    for (let b = 0; b < P.length; b++) P[b] = fRe[b] * fRe[b] + fIm[b] * fIm[b];
+  }
+  // f çevresindeki çeyrek ses genişliğindeki bandın gücü
+  function bandPow(P, f) {
+    const lo = Math.max(1, Math.round(f * 0.9715 / ODF)), hi = Math.min(P.length - 1, Math.round(f * 1.0293 / ODF));
+    let s = 0; for (let b = lo; b <= hi; b++) s += P[b];
+    return s;
+  }
+  async function decodeMono(ab) {
+    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const buf = await new OC(1, 1, OFS).decodeAudioData(ab);   // her makinede 44,1 kHz'e çevrilir
+    const n = buf.length, x = new Float32Array(n), ch = buf.numberOfChannels;
+    for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) x[i] += d[i] / ch; }
+    return x;
+  }
+  async function analyzeOffline(x, target, onProg) {
+    fftInit();
+    const nF = Math.max(1, Math.floor((x.length - ON) / OHOP) + 1);
+    const E = new Float32Array(nF * 12), tot = new Float32Array(nF), Lf = new Float32Array(nF), P = new Float64Array(ON / 2);
+    for (let j = 0; j < nF; j++) {
+      const pos = j * OHOP; let s2 = 0;
+      for (let i = 0; i < ON && pos + i < x.length; i++) s2 += x[pos + i] * x[pos + i];
+      Lf[j] = 10 * Math.log10(s2 / ON + 1e-12);
+      powerSpec(x, pos, P);
+      for (let b = bLo; b < bHi; b++) { const s = semiOf[b]; if (s >= 0) E[j * 12 + (s + M0) % 12] += P[b]; }
+      for (let k = 0; k < 12; k++) tot[j] += E[j * 12 + k];
+      if (j % 64 === 63) { onProg(j / nF); await new Promise(r => setTimeout(r)); }
+    }
+    let Lmax = -120; for (let j = 0; j < nF; j++) if (Lf[j] > Lmax) Lmax = Lf[j];
+    // Artış oranı: nota adının enerjisi, bir pencere öncesine göre o anki toplamın ne kadarı kadar arttı
+    const D = ON / OHOP, R = new Float32Array(nF * 12);
+    for (let j = 0; j < nF; j++) if (tot[j] > 0) for (let k = 0; k < 12; k++)
+      R[j * 12 + k] = (E[j * 12 + k] - (j >= D ? E[(j - D) * 12 + k] : 0)) / tot[j];
+    const at = (j, k) => (j < 0 || j >= nF ? -1 : R[j * 12 + k]);
+    const cand = [], lastJ = new Int32Array(12).fill(-99);
+    for (let j = 0; j < nF; j++) {
+      if (Lf[j] < Lmax - 40) continue;                       // sessizlik
+      let mx = 0; for (let k = 0; k < 12; k++) if (E[j * 12 + k] > mx) mx = E[j * 12 + k];
+      for (let k = 0; k < 12; k++) {
+        const r = R[j * 12 + k];
+        if (r < 0.06 || E[j * 12 + k] < 0.15 * mx || j - lastJ[k] < 3) continue;
+        if (r < at(j - 1, k) || r < at(j - 2, k) || r <= at(j + 1, k) || r <= at(j + 2, k)) continue;   // artışın tepe anı
+        lastJ[k] = j;
+        cand.push({ j, k, w: r * (0.4 + 0.6 * clamp((Lf[j] - (Lmax - 40)) / 40, 0, 1)) });
+      }
+    }
+    cand.sort((a, b) => b.w - a.w || a.j - b.j || a.k - b.k);
+    const sel = cand.slice(0, target).sort((a, b) => a.j - b.j || a.k - b.k);
+    // İkinci geçiş: seçilen anlarda oktavı, seviyeyi ve armonikleri ölç
+    const ev = [], S = new Float64Array(NSEMI), Sp = new Float64Array(NSEMI), Sb = new Int32Array(NSEMI);
+    let curJ = -1;
+    for (const c of sel) {
+      const jm = Math.min(c.j + 2, nF - 1);                  // nota pencerenin ortasına yerleşmişken
+      if (jm !== curJ) {
+        powerSpec(x, jm * OHOP, P); curJ = jm; S.fill(0); Sp.fill(0);
+        for (let b = bLo; b < bHi; b++) { const s = semiOf[b]; if (s < 0) continue; S[s] += P[b]; if (P[b] > Sp[s]) { Sp[s] = P[b]; Sb[s] = b; } }
+      }
+      // Oktav: bandın toplamı değil tepe değeri karşılaştırılır (geniş tiz bantlar hışırtıyla şişmesin); yeterince güçlü en pes oktav seçilir
+      let best = 0; for (let s = 0; s < NSEMI; s++) if ((s + M0) % 12 === c.k && Sp[s] > best) best = Sp[s];
+      let si = -1; for (let s = 0; s < NSEMI && si < 0; s++) if ((s + M0) % 12 === c.k && Sp[s] >= 0.3 * best) si = s;
+      if (si < 0 || best <= 0) continue;
+      // Perde yarım sese yuvarlanmaz: tepe kutusunun çevresinden kesirli frekans bulunur (akort ve titretme renge yansır)
+      const b0 = Sb[si], la = Math.log(P[b0 - 1] + 1e-30), lb = Math.log(P[b0] + 1e-30), lc = Math.log(P[b0 + 1] + 1e-30), dn = la - 2 * lb + lc;
+      const f = (b0 + (dn < 0 ? clamp(0.5 * (la - lc) / dn, -0.5, 0.5) : 0)) * ODF, m = midiOf(f);
+      const re = new Float32Array(NH), im = new Float32Array(NH);
+      let amax = 0;
+      for (let hI = 1; hI <= NH; hI++) { const a = hI * f < OFS * 0.45 ? Math.sqrt(bandPow(P, hI * f)) : 0; re[hI - 1] = a; if (a > amax) amax = a; }
+      let num = 0, den = 0;
+      for (let hI = 1; hI <= NH; hI++) { let a = re[hI - 1] / amax; if (a < 0.02) a = 0; re[hI - 1] = a; num += hI * hI * a * a; den += a * a; }
+      let tj = 0, ek = 0; for (let k = 0; k < 12; k++) { let e = 0; for (let s = 0; s < NSEMI; s++) if ((s + M0) % 12 === k) e += S[s]; tj += e; if (k === c.k) ek = e; }
+      ev.push({ m, L: Lf[jm] + 10 * Math.log10(Math.max(ek / tj, 1e-3)), q: Math.max(1, Math.sqrt(num / den)), h: { re, im }, t: c.j * OHOP / OFS });
+    }
+    return { ev, found: cand.length, dur: x.length / OFS };
+  }
+
+  let ordX = null, ordName = '', ordBusy = false;
+  const slugOf = s => s.toLowerCase().replace(/[^a-z0-9ğüşöçı]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+  async function runOrder() {
+    if (!ordX || ordBusy) return;
+    ordBusy = true;
+    const t0 = performance.now(), target = +$('ordCount').value;
+    try {
+      const res = await analyzeOffline(ordX, target, p => setStatus(`${ordName} çözümleniyor… %${Math.round(p * 100)}`));
+      if (!res.ev.length) { setStatus('Bu kayıtta belirgin bir ses bulunamadı.', true); return; }
+      if (ctx) { silenceVoices(); stopFile(); }
+      example = false; clearAll();
+      const Ls = res.ev.map(e => e.L).sort((a, b) => a - b), lo = Ls[Math.floor(Ls.length * 0.05)], hi = Ls[Math.floor(Ls.length * 0.99)];
+      // Parlaklık aralığı kaydın kendisinden; alt uç biraz aşağı çekilir ki en sessiz notalar da görünür kalsın
+      [lvlLo, lvlHi] = hi - lo < 8 ? [hi - 16, hi] : [lo - 0.3 * (hi - lo), hi];
+      if (res.ev.length > cap) { cap = Math.min(5000, Math.ceil(res.ev.length / 50) * 50); $('sldCap').value = cap; $('valCap').textContent = cap + ' nota'; }
+      for (const e of res.ev) addNote(e.m, e.L, e.q, -1e7, e.h);
+      picTitle = $('ordTitle').value.trim() || ordName.replace(/\.[^.]+$/, '');
+      lastConst = slugOf(picTitle);
+      panelDirty = true; paintDirty = true;
+      const d = Math.round(res.dur);
+      setStatus(`${ordName}: ${Math.floor(d / 60)} dk ${d % 60} sn kayıt ${tr((performance.now() - t0) / 1000, 1)} saniyede çözümlendi; bulunan ${res.found} andan en güçlü ${notes.length} tanesi çizildi.`);
+    } catch (err) { console.error('sipariş çözümlemesi:', err); setStatus('Çözümleme sırasında bir sorun oldu. Dosyayı yeniden seç.', true); }
+    finally { ordBusy = false; }
+  }
+  $('ordFileBtn').addEventListener('click', () => $('ordFile').click());
+  $('ordFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    setStatus(f.name + ' açılıyor…');
+    try { ordX = await decodeMono(await f.arrayBuffer()); ordName = f.name; }
+    catch (_) { setStatus('Bu dosya açılamadı. MP3, WAV, M4A ya da OGG dene.', true); return; }
+    runOrder();
+  });
+  $('ordCount').addEventListener('change', runOrder);
+
+  // Baskı: resim ekrandan kopyalanmaz, istenen piksel boyutunda baştan çizilir (300 dpi)
+  const POSTER = { a4: [2480, 3508, 'A4'], a3: [3508, 4961, 'A3'], in8x10: [2400, 3000, '8x10in'], in16x20: [4800, 6000, '16x20in'], cm50x70: [5906, 8268, '50x70cm'], sq30: [3543, 3543, '30x30cm'] };
+  function renderPoster(key, light, title, sub) {
+    const [pw, ph] = POSTER[key];
+    const out = document.createElement('canvas'); out.width = pw; out.height = ph;
+    const x = out.getContext('2d');
+    const bg = light ? [247, 244, 236] : BG, fg = light ? '#1b1d26' : '#eceef8', mut = light ? '#6b6f80' : '#8b90a9';
+    x.fillStyle = `rgb(${bg})`; x.fillRect(0, 0, pw, ph);
+    const mar = Math.round(pw * 0.07), capH = Math.round(ph * (ph > pw ? 0.16 : 0.18));
+    const zoneH = ph - 2 * mar - capH, side = Math.min(pw - 2 * mar, zoneH);
+    const ax = (pw - side) / 2, ay = mar + (zoneH - side) / 2;
+    // Çizim işlevleri ekran ölçülerini kullanır; baskı süresince poster ölçüleri geçici olarak yerlerine konur
+    const sv = [W, H, dpr, cx0, cy0, size, unit], LOG = 900;
+    try {
+      dpr = side / LOG; W = pw / dpr; H = ph / dpr; cx0 = (ax + side / 2) / dpr; cy0 = (ay + side / 2) / dpr; size = LOG; unit = LOG * 0.47;
+      inkBg = light ? bg : null;
+      const N = Math.max(cap, notes.length);
+      for (let i = 0; i < notes.length; i++) drawNote(x, notes[i], i, N, false);
+    } finally { inkBg = null; [W, H, dpr, cx0, cy0, size, unit] = sv; }
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    const u = pw / 1000, y0 = ph - mar - capH;
+    x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+    if (title) {
+      let fs = 36 * u;
+      do { x.font = `600 ${fs}px "Unbounded", "Segoe UI", sans-serif`; fs *= 0.94; } while (x.measureText(title).width > pw - 2 * mar && fs > 12 * u);
+      x.fillStyle = fg; x.fillText(title, pw / 2, y0 + capH * 0.42);
+    }
+    if (sub) {
+      let fs = 15 * u;
+      do { x.font = `${fs}px "JetBrains Mono", ui-monospace, Consolas, monospace`; fs *= 0.94; } while (x.measureText(sub).width > pw - 2 * mar && fs > 8 * u);
+      x.fillStyle = mut; x.fillText(sub, pw / 2, y0 + capH * 0.62);
+    }
+    // Renk şeridi: resimdeki bütün notaların renkleri, tona göre sıralı
+    const srt = notes.slice().sort((a, b) => a.H - b.H || a.V - b.V), sw = pw * 0.36, sx = (pw - sw) / 2, sy = y0 + capH * 0.76, cw = sw / srt.length;
+    inkBg = light ? bg : null;
+    for (let i = 0; i < srt.length; i++) { x.fillStyle = `rgb(${inkBg ? inkOf(srt[i]) : srt[i].c})`; x.fillRect(sx + i * cw, sy, Math.ceil(cw), 5 * u); }
+    inkBg = null;
+    x.fillStyle = mut; x.font = `${9.5 * u}px "JetBrains Mono", ui-monospace, Consolas, monospace`;
+    x.fillText(`${notes.length} ♪ · f(♪) = (R, G, B)`, pw / 2, y0 + capH * 0.76 + 24 * u);
+    return out;
+  }
+  $('ordPrint').addEventListener('click', async () => {
+    if (!notes.length) { setStatus('Önce bir resim oluştur: bir ses dosyası seç ya da çal.', true); return; }
+    const key = $('ordSize').value, light = $('ordBg').value === 'light', [pw, ph, label] = POSTER[key];
+    const title = $('ordTitle').value.trim(), sub = $('ordSub').value.trim();
+    setStatus('Baskı dosyası hazırlanıyor…');
+    try {
+      if (document.fonts && document.fonts.load) await Promise.all([document.fonts.load('600 40px "Unbounded"'), document.fonts.load('16px "JetBrains Mono"')]).catch(() => {});
+      await new Promise(r => setTimeout(r, 30));
+      const out = renderPoster(key, light, title, sub);
+      const blob = await new Promise(r => out.toBlob(r, 'image/png'));
+      if (!blob) throw new Error('boş');
+      const a = document.createElement('a');
+      a.download = `nota-resmi-${slugOf(title || picTitle || 'resim') || 'resim'}-${label}-${light ? 'acik' : 'koyu'}.png`;
+      a.href = URL.createObjectURL(blob);
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      setStatus(`Baskı dosyası hazır: ${pw}×${ph} piksel (${label}, 300 dpi), ${tr(blob.size / 1048576, 1)} MB.`);
+    } catch (_) { setStatus('Baskı dosyası oluşturulamadı. Daha küçük bir boyut dene.', true); }
+  });
+
+  window.notaResmi = { notes, log: dbgLog, renderPoster };   // sınama ve merak için: çizilen notaların listesi
   resize();
   setShape('cardioid');
   setLayout('mandala');
