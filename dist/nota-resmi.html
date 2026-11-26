@@ -243,6 +243,7 @@ button,input{font:inherit;color:inherit}
         <dt>yön φ = H</dt><dd id="fnPhi">—</dd>
         <dt>boyut a = 0,18 + 0,82·V</dt><dd id="fnA">—</dd>
         <dt>sivrilik p = 1 + 1,5·(1 − S)</dt><dd id="fnP">—</dd>
+        <div class="wide par" id="fnHarm">armonikler |cₖ|: —</div>
       </dl>
       <p class="desc">Girdiler: f notanın frekansı (Hz), q tınının parlaklığı (sesin etkin frekansının f'ye oranı; saf sinüste 1), L vuruş anındaki ses seviyesi (dB). Nota adı ana tonu ve eğrinin yönünü, tını doygunluğu ve sivriliği, vuruş şiddeti parlaklığı ve boyutu belirler. Mikrofonda L₀ = −42 dB ve L₁ = −12 dB sabittir; eklenen müzikte parçanın kendi ses aralığına göre ayarlanır.</p>
       <div class="legend" id="legend" aria-label="Nota adına göre renk tonu"></div>
@@ -256,6 +257,7 @@ button,input{font:inherit;color:inherit}
         <button class="mode" data-shape="epi" aria-pressed="false">Episikloid</button>
         <button class="mode" data-shape="lemniscate" aria-pressed="false">Lemniskat</button>
         <button class="mode" data-shape="ellipse" aria-pressed="false">Halka</button>
+        <button class="mode" data-shape="fourier" aria-pressed="false">Fourier</button>
         <button class="mode" data-shape="mixed" aria-pressed="false">Karışık</button>
       </div>
       <p class="eq" id="shapeEq"></p>
@@ -381,6 +383,8 @@ button,input{font:inherit;color:inherit}
       desc: 'Her nota φ yönünde yatan bir lemniskat (sekiz) çizer; doygunluk halkaların genişliğini belirler.' },
     ellipse: { eq: '(x, y) = a · (cos t, b·sin t),   b = 0,35 + 0,65·S',
       desc: 'Her nota φ yönünde yatan bir halka çizer; tam doygun notada halka çemberdir, tını parlaklaştıkça basıklaşır.' },
+    fourier: { eq: 'z(t) = Σ cₖ · e^(i·k·t),   k = 1…8,   cₖ = notanın k. armoniği (genlik ve faz)',
+      desc: 'Her nota kendi tınısını çizer: eğri, sesin ölçülen ilk 8 armoniğinin toplamıdır, yani dalga biçiminin karmaşık düzlemdeki yörüngesi. Saf sinüs çember verir; armonikler güçlendikçe çembere ilmekler ve girintiler eklenir. Aynı nota farklı yerden ya da farklı çalgıyla çalınınca şekil değişir.' },
     mixed: { eq: 'şekil = nota adına göre: Do, Mi, Sol♯ → kardioid · Do♯, Fa, La → yaprak · …',
       desc: 'Şekil türü nota adından seçilir (nota mod 5): kardioid, yaprak, episikloid, lemniskat, halka. Tek resimde beş eğri ailesi birlikte görünür.' }
   };
@@ -393,10 +397,18 @@ button,input{font:inherit;color:inherit}
 
   function mark(c) { const i = (c[0] >> 4) << 8 | (c[1] >> 4) << 4 | (c[2] >> 4); if (!cov[i]) { cov[i] = 1; covN++; } }
   function recount() { cov.fill(0); covN = 0; for (const n of notes) mark(n.c); }
-  function addNote(m, L, q, now) {
+  // Ölçüm olmayan notalar (matematik dizileri, örnek resim) için armonikler: |cₖ| = k^(−α), faz (k − 1)·θ.
+  // α tınıdan gelir: yumuşak tınıda 3 (armonikler hızla söner), parlak tınıda 1.
+  const NH = 8;
+  function synthHarm(q, theta) {
+    const al = 3 - 2 * clamp(Math.log2(Math.max(q, 1)) / 3, 0, 1), re = new Float32Array(NH), im = new Float32Array(NH);
+    for (let k = 1; k <= NH; k++) { const a = Math.pow(k, -al); re[k - 1] = a * Math.cos((k - 1) * theta); im[k - 1] = a * Math.sin((k - 1) * theta); }
+    return { re, im };
+  }
+  function addNote(m, L, q, now, h) {
     if (notes.length >= 20000) return;
     const o = noteFn(m, L, q);
-    const n = { m, L, q, f: freqOf(m), H: o.H, S: o.S, V: o.V, c: o.c, t: now };
+    const n = { m, L, q, f: freqOf(m), H: o.H, S: o.S, V: o.V, c: o.c, t: now, h: h || synthHarm(q, 0) };
     notes.push(n);
     mark(o.c);
     panelDirty = true;
@@ -411,15 +423,26 @@ button,input{font:inherit;color:inherit}
   function clearAll() { notes.length = 0; recount(); panelDirty = true; paintDirty = true; hasMicNotes = false; lastConst = ''; picTitle = ''; }
 
   // Notanın eğrisi: birim boyutta, başlangıç noktasına göre. Yön φ = H, sivrilik p = 1 + 1,5·(1 − S).
-  const SN = 220, SX = new Float32Array(SN + 1), SY = new Float32Array(SN + 1);
+  const SN = 360, SX = new Float32Array(SN + 1), SY = new Float32Array(SN + 1), FX = new Float32Array(SN + 1), FY = new Float32Array(SN + 1);
   function shapePath(n) {
     const phi = n.H * Math.PI / 180, p = 1 + 1.5 * (1 - n.S), oct = clamp(Math.floor((n.m - 40) / 12), 0, 4);
     const kind = shape === 'mixed' ? KINDS[((Math.round(n.m) % 5) + 5) % 5] : shape;
     const c = Math.cos(phi), s = Math.sin(phi);
+    let fmax = 1;
+    if (kind === 'fourier') {
+      // z(t) = Σ cₖ·e^(ikt): armoniklerin toplamı. Sonra en uzak nokta 1 olacak biçimde ölçeklenir.
+      const re = n.h.re, im = n.h.im; fmax = 1e-9;
+      for (let i = 0; i <= SN; i++) {
+        const t = i / SN * Math.PI * 2; let x = 0, y = 0;
+        for (let k = 0; k < NH; k++) { const a = (k + 1) * t, ca = Math.cos(a), sa = Math.sin(a); x += re[k] * ca - im[k] * sa; y += re[k] * sa + im[k] * ca; }
+        FX[i] = x; FY[i] = y; const r = Math.hypot(x, y); if (r > fmax) fmax = r;
+      }
+    }
     for (let i = 0; i <= SN; i++) {
       const t = i / SN * Math.PI * 2;
       let x, y;
-      if (kind === 'cardioid') { const r = Math.pow((1 + Math.cos(t)) / 2, p); x = r * Math.cos(t); y = r * Math.sin(t); }
+      if (kind === 'fourier') { x = 0.5 + 0.5 * FX[i] / fmax; y = 0.5 * FY[i] / fmax; }   // merkeze değen, φ yönünde uzanan halka
+      else if (kind === 'cardioid') { const r = Math.pow((1 + Math.cos(t)) / 2, p); x = r * Math.cos(t); y = r * Math.sin(t); }
       else if (kind === 'rose') { const r = Math.pow(Math.abs(Math.cos((3 + oct) * t / 2)), p); x = r * Math.cos(t); y = r * Math.sin(t); }
       else if (kind === 'epi') { const k = 1 + oct; x = ((k + 1) * Math.cos(t) - Math.cos((k + 1) * t)) / (k + 2); y = ((k + 1) * Math.sin(t) - Math.sin((k + 1) * t)) / (k + 2); }
       else if (kind === 'lemniscate') { const d = 1 + Math.sin(t) * Math.sin(t); x = Math.cos(t) / d; y = (0.6 + 0.8 * n.S) * Math.sin(t) * Math.cos(t) / d; }
@@ -619,7 +642,7 @@ button,input{font:inherit;color:inherit}
       const d0 = +D[i], d1 = +D[i + 1], d2 = +D[i + 2];
       const m = 40 + 12 * Math.floor(d0 / 5) + PENTA[d0 % 5];
       const V = 0.25 + 0.75 * d1 / 9, S = 1 - 0.75 * d2 / 9;
-      list.push({ t: i * step, m, L: -42 + 30 * V, q: Math.pow(2, 3 * (1 - S)), d: d0 });
+      list.push({ t: i * step, m, L: -42 + 30 * V, q: Math.pow(2, 3 * (1 - S)), d: d0, th: 2 * Math.PI * d1 / 10 });
       pluck(freqOf(m), t0 + i * step - ctx.currentTime, V, step, 0.2, 0.6 * d2 / 9);
     }
     mathSeq = { key, list, t0, i: 0, kept };
@@ -630,7 +653,7 @@ button,input{font:inherit;color:inherit}
   function stepMath(now) {
     const q = mathSeq, tn = ctx.currentTime - q.t0, name = CONSTS[q.key].name;
     while (q.i < q.list.length && tn >= q.list[q.i].t + 0.02) {
-      const n = q.list[q.i]; addNote(n.m, n.L, n.q, now); q.i++;
+      const n = q.list[q.i]; addNote(n.m, n.L, n.q, now, synthHarm(n.q, n.th)); q.i++;
       setStatus(`${name} = ${CONSTS[q.key].digits[0]},${CONSTS[q.key].digits.slice(1, 12)}…   ${q.i}. basamak: ${n.d} → ${noteName(n.m)}`);
     }
     if (q.i >= q.list.length && tn > q.list[q.list.length - 1].t + 0.7) {
@@ -838,6 +861,21 @@ button,input{font:inherit;color:inherit}
     if (sy <= 0) return 0;
     return (fs / 4) / Math.PI * Math.asin(Math.min(1, Math.sqrt(sd / sy) / 2));
   }
+  // Armonikler: notanın tam periyot sayısı kadar örneğinde, f₀'ın katlarındaki karmaşık Fourier katsayıları.
+  // En güçlüsü 1 olacak biçimde ölçeklenir; %2'nin altındakiler gürültü sayılıp atılır.
+  function harmonics(fs, f0) {
+    const per = fs / f0, P = Math.max(1, Math.floor(2048 / per)), N = Math.min(FFT, Math.round(P * per)), st = FFT - N;
+    const re = new Float32Array(NH), im = new Float32Array(NH);
+    let mx = 0;
+    for (let k = 1; k <= NH && k * f0 < fs * 0.45; k++) {
+      const w = 2 * Math.PI * k * f0 / fs; let a = 0, b = 0;
+      for (let j = 0; j < N; j++) { const x = timeBuf[st + j]; a += x * Math.cos(w * j); b -= x * Math.sin(w * j); }
+      re[k - 1] = a; im[k - 1] = b; mx = Math.max(mx, Math.hypot(a, b));
+    }
+    if (mx <= 0) { re[0] = 1; return { re, im }; }
+    for (let k = 0; k < NH; k++) { re[k] /= mx; im[k] /= mx; if (Math.hypot(re[k], im[k]) < 0.02) re[k] = im[k] = 0; }
+    return { re, im };
+  }
   // Tek perde bulunamazsa (akor gibi): spektrumun en güçlü tepesi
   function spectralPeak(fs) {
     const binHz = fs / FFT, k1 = Math.floor(1500 / binHz);
@@ -877,7 +915,7 @@ button,input{font:inherit;color:inherit}
       if (now - pend.t > 60 && f) pend.ps.push(f);
       if (now - pend.t > 115) {
         const pf = median(pend.ps) || spectralPeak(fs);
-        if (pf) { const m = midiOf(pf); addNote(m, 20 * Math.log10(Math.max(pend.peak, 1e-5)), effectiveFreq(fs) / pf, now); curM = m; if (micStream) hasMicNotes = true; }
+        if (pf) { const m = midiOf(pf); addNote(m, 20 * Math.log10(Math.max(pend.peak, 1e-5)), effectiveFreq(fs) / pf, now, harmonics(fs, pf)); curM = m; if (micStream) hasMicNotes = true; }
         pend = null; candSince = 0;
       }
     } else if (active && pitch && rms > GATE * 3) {
@@ -885,7 +923,7 @@ button,input{font:inherit;color:inherit}
       const m = midiOf(pitch);
       if (curM === null || Math.abs(m - curM) > 0.6) {
         if (candSince && Math.abs(m - candM) < 0.4) {
-          if (now - candSince > 90) { addNote(m, 20 * Math.log10(rmsShort), effectiveFreq(fs) / pitch, now); curM = m; candSince = 0; }
+          if (now - candSince > 90) { addNote(m, 20 * Math.log10(rmsShort), effectiveFreq(fs) / pitch, now, harmonics(fs, pitch)); curM = m; candSince = 0; }
         } else { candM = m; candSince = now; }
       } else candSince = 0;
     }
@@ -898,7 +936,7 @@ button,input{font:inherit;color:inherit}
     const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
     for (let i = 0; i < 64; i++) {
       m = clamp(m + [-5, -3, -2, -2, 2, 2, 3, 5, 7, -7][Math.floor(rnd() * 10)], 40, 79);
-      addNote(m, -40 + 28 * Math.abs(Math.sin(i * 0.11)) + rnd() * 6, Math.pow(2, 2.6 * rnd() * rnd()), -1e6);
+      { const q0 = Math.pow(2, 2.6 * rnd() * rnd()); addNote(m, -40 + 28 * Math.abs(Math.sin(i * 0.11)) + rnd() * 6, q0, -1e6, synthHarm(q0, rnd() * 6.283)); }
     }
   })();
 
@@ -928,6 +966,7 @@ button,input{font:inherit;color:inherit}
       el.rgb.textContent = 'R   –  G   –  B   –'; el.hex.textContent = 'henüz nota yok';
       el.note.innerHTML = 'Son nota: <b>—</b>';
       for (const k of ['m', 'h', 's', 'v', 'out', 'phi', 'a', 'p']) el[k].textContent = '—';
+      $('fnHarm').textContent = 'armonikler |cₖ|: —';
       return;
     }
     const c = n.c;
@@ -941,6 +980,7 @@ button,input{font:inherit;color:inherit}
     el.v.textContent = tr(n.V, 2);
     el.out.textContent = `(${c.join(', ')})`;
     el.phi.textContent = tr(n.H, 0) + '°'; el.a.textContent = tr(0.18 + 0.82 * n.V, 2); el.p.textContent = tr(1 + 1.5 * (1 - n.S), 2);
+    $('fnHarm').textContent = 'armonikler |cₖ|: ' + Array.from({ length: 6 }, (_, k) => tr(Math.hypot(n.h.re[k], n.h.im[k]), 2)).join(' · ');
     const mx = Math.max(c[0], c[1], c[2], 1), k = Math.max(1, 200 / mx);
     document.documentElement.style.setProperty('--note', `rgb(${c.map(v => Math.min(255, Math.round(v * k) + 30))})`);
   }
