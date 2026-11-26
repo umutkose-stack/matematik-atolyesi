@@ -61,6 +61,13 @@ button,input{font:inherit;color:inherit}
 .str:hover{background:#1c2033}
 .str:active{transform:translateY(1px)}
 .str.math{font-size:13px;min-width:34px;border-bottom-color:var(--muted)}
+.str.add{border-style:dashed;border-bottom-style:dashed;border-color:var(--muted);border-bottom-width:1px;padding-bottom:5px}
+.tracks{display:contents}
+.trk{display:inline-flex}
+.trk .track{border-radius:8px 0 0 8px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trk .track[aria-pressed="true"]{background:var(--text);color:var(--stage)}
+.trk .x{border-radius:0 8px 8px 0;border-left:0;padding-left:7px;padding-right:7px;color:var(--muted)}
+.trk .x:hover{color:#ffb3bd}
 .spacer{flex:1 1 0}
 
 .work{display:grid;grid-template-columns:minmax(0,1fr) 356px;min-height:0}
@@ -156,7 +163,10 @@ button,input{font:inherit;color:inherit}
     <button class="str" id="melBtn">Melodi</button>
     <button class="str" id="chromBtn">Kromatik gam</button>
     <button class="str" id="improBtn">Doğaçlama</button>
-    <button class="str" id="donBtn">Dönence tarzı</button>
+    <span class="label" style="margin-left:8px">Müziklerim</span>
+    <span id="tracks" class="tracks"></span>
+    <button class="str add" id="addMusicBtn" title="Bilgisayarından bir ya da birkaç ses dosyası seç">+ Müzik ekle</button>
+    <input type="file" id="fileInput" accept="audio/*" multiple hidden>
     <span class="label" style="margin-left:8px">Matematik çalsın</span>
     <button class="str math" data-const="e" title="e sayısının ilk 100 basamağı">e</button>
     <button class="str math" data-const="pi" title="π sayısının ilk 100 basamağı">π</button>
@@ -164,8 +174,6 @@ button,input{font:inherit;color:inherit}
     <button class="str math" data-const="phi" title="Altın oranın ilk 100 basamağı">φ</button>
   </div>
   <span class="spacer"></span>
-  <button id="fileBtn" class="btn">Ses dosyası çal</button>
-  <input type="file" id="fileInput" accept="audio/*" hidden>
   <button id="fsBtn" class="btn">Tam ekran</button>
 </header>
 
@@ -425,7 +433,7 @@ button,input{font:inherit;color:inherit}
   const voices = [];
   const timeBuf = new Float32Array(FFT);
   const freqBuf = new Float32Array(FFT / 2).fill(-120);
-  const statusEl = $('status'), micBtn = $('micBtn'), fileBtn = $('fileBtn'), fileInput = $('fileInput');
+  const statusEl = $('status'), micBtn = $('micBtn'), fileInput = $('fileInput');
   function setStatus(t, warn) { statusEl.textContent = t; statusEl.classList.toggle('warn', !!warn); }
 
   function ensureAudio() {
@@ -580,31 +588,10 @@ button,input{font:inherit;color:inherit}
     }
   }
 
-  // "Dönence tarzı": şarkının kendisi değil, o havada dört bölümlük özgün bir parça (bas yürüyüşü, arpej, solo, kapanış).
-  // Notalar kullanıcının gönderdiği stüdyo dosyasındaki "Dönence Tarzı Demo"dan alınmıştır.
-  const DONENCE = (() => {
-    const sc = []; let t = 0;
-    [82.41, 82.41, 98, 82.41, 110, 98, 87.31, 82.41, 82.41, 82.41, 123.47, 110, 98, 87.31, 82.41, 82.41]
-      .forEach((f, i) => { sc.push({ f, t, v: i % 4 ? 0.45 : 0.65, b: 0.02 }); t += 0.3125; });
-    [329.63, 392, 493.88, 659.25, 493.88, 392, 329.63, 440, 349.23, 440, 523.25, 659.25, 523.25, 440, 392, 329.63, 293.66, 392, 493.88, 587.33, 493.88, 392, 329.63, 493.88]
-      .forEach((f, i) => { sc.push({ f, t, v: 0.5 + 0.3 * Math.pow(Math.sin(i * 0.4), 2), b: 0.15 }); t += 0.25; });
-    [[329.63, 0.65], [392, 0.45], [440, 0.55], [493.88, 0.7], [523.25, 0.45], [493.88, 0.4], [440, 0.45], [392, 0.45], [349.23, 0.4], [659.25, 0.9]]
-      .forEach(([f, d], i) => { sc.push({ f, t, v: 0.8 + 0.2 * i / 9, b: 0.5 }); t += d; });
-    [82.41, 98, 87.31, 82.41, 123.47, 110, 98, 82.41]
-      .forEach((f, i) => { sc.push({ f, t, v: Math.max(0.22, 0.55 * (1 - i / 9)), b: 0.02 }); t += 0.42; });
-    return sc;
-  })();
-  $('donBtn').addEventListener('click', () => {
-    if (!ensureAudio()) return;
-    silenceVoices();
-    DONENCE.forEach((n, i) => pluck(n.f, n.t, n.v, DONENCE[i + 1] ? DONENCE[i + 1].t - n.t : 1.8, 0.2, n.b));
-    if (!micStream) setStatus('Dönence tarzı özgün parça çalıyor: bas yürüyüşü, arpej, solo ve kapanış. Şarkının kendisi için kendi ses dosyanı "Ses dosyası çal" ile yükle.');
-  });
   // Durdur: çalan ve sıraya alınmış bütün örnek sesleri ve ses dosyasını keser. Mikrofona ve resme dokunmaz.
   function stopAll() {
     if (ctx) silenceVoices();
-    const hadFile = !!fileSrc;
-    if (hadFile) stopFile();
+    stopFile();
     setStatus('Çalan ses durduruldu. Resmin olduğu gibi duruyor.');
   }
   $('stopBtn').addEventListener('click', stopAll);
@@ -615,31 +602,99 @@ button,input{font:inherit;color:inherit}
     if (n >= 0) playString(STRINGS[n]);
   });
 
-  // Ses dosyası
+  /* ============ Müziklerim: kullanıcının eklediği ses dosyaları ============
+     Dosyalar yalnızca bu tarayıcıda (IndexedDB) saklanır, hiçbir sunucuya gönderilmez.
+     Depolama kullanılamıyorsa liste yalnızca bu oturum boyunca durur. */
+  const trackBox = $('tracks');
+  const tracks = [];            // { id, name, blob }
+  let db = null, playingId = null, tmpId = -1;
+  function openDb() {
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('nota-resmi', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('tracks', { keyPath: 'id', autoIncrement: true });
+        r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null);
+      } catch (_) { res(null); }
+    });
+  }
+  function store(mode, fn) {
+    return new Promise(res => {
+      if (!db) return res(null);
+      try {
+        const t = db.transaction('tracks', mode), rq = fn(t.objectStore('tracks'));
+        t.oncomplete = () => res(rq ? rq.result : null); t.onerror = t.onabort = () => res(null);
+      } catch (_) { res(null); }
+    });
+  }
+  function renderTracks() {
+    trackBox.textContent = '';
+    for (const t of tracks) {
+      const wrap = document.createElement('span'); wrap.className = 'trk';
+      const b = document.createElement('button'); b.className = 'str track'; b.textContent = '♪ ' + t.name;
+      b.title = t.name + ' müziğini çal ve resmini çiz';
+      b.setAttribute('aria-pressed', String(playingId === t.id));
+      b.addEventListener('click', () => playTrack(t));
+      const x = document.createElement('button'); x.className = 'str x'; x.textContent = '×';
+      x.setAttribute('aria-label', t.name + ' müziğini listeden sil'); x.title = 'Listeden sil';
+      x.addEventListener('click', () => removeTrack(t));
+      wrap.append(b, x); trackBox.append(wrap);
+    }
+  }
   function stopFile() {
     if (fileSrc) { try { fileSrc.stop(); } catch (_) {} fileSrc = null; }
-    fileBtn.textContent = 'Ses dosyası çal';
+    if (playingId !== null) { playingId = null; renderTracks(); }
   }
-  fileBtn.addEventListener('click', () => { if (fileSrc) { stopFile(); setStatus('Dosya durduruldu.'); } else fileInput.click(); });
-  fileInput.addEventListener('change', async () => {
-    const f = fileInput.files && fileInput.files[0];
-    fileInput.value = '';
-    if (!f || !ensureAudio()) return;
+  async function playTrack(t) {
+    if (!ensureAudio()) return;
     try {
-      setStatus('Dosya çözümleniyor…');
-      const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+      setStatus(t.name + ' çözümleniyor…');
+      const buf = await ctx.decodeAudioData(await t.blob.arrayBuffer());
       stopFile(); silenceVoices();
+      const kept = hasMicNotes;
+      if (!kept) clearAll();           // her müzik kendi resmini çizsin; mikrofonla çizdiğin resim varsa korunur
       const src = ctx.createBufferSource(); src.buffer = buf;
       const tap = ctx.createGain(); tap.gain.value = 1 / sens;
       src.connect(ctx.destination); src.connect(tap); tap.connect(input);
-      src.onended = () => { if (fileSrc === src) { stopFile(); setStatus('Dosya bitti.'); } };
-      src.start(); fileSrc = src;
-      fileBtn.textContent = 'Dosyayı durdur';
-      setStatus('Çalıyor: ' + f.name);
+      src.onended = () => { if (fileSrc === src) { stopFile(); setStatus(`${t.name} bitti: resmi tamam (${notes.length} eğri).`); } };
+      src.start(); fileSrc = src; playingId = t.id;
+      if (!kept) lastConst = t.name.toLowerCase().replace(/[^a-z0-9ğüşöçı]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+      renderTracks();
+      setStatus('Çalıyor: ' + t.name + (kept ? ' (mevcut resminin üstüne çiziliyor)' : ''));
     } catch (_) {
       setStatus('Bu dosya çözümlenemedi. MP3, WAV, M4A ya da OGG dene.', true);
     }
+  }
+  async function removeTrack(t) {
+    if (playingId === t.id) stopFile();
+    const i = tracks.indexOf(t); if (i >= 0) tracks.splice(i, 1);
+    if (t.id > 0) await store('readwrite', s => s.delete(t.id));
+    renderTracks(); setStatus(t.name + ' listeden silindi.');
+  }
+  async function addFiles(files) {
+    let first = null, saved = true;
+    for (const f of files) {
+      const name = f.name.replace(/\.[^.]+$/, '').trim().slice(0, 40) || 'Müzik';
+      let id = await store('readwrite', s => s.add({ name, blob: f }));
+      if (typeof id !== 'number') { id = tmpId--; saved = false; }
+      const t = { id, name, blob: f }; tracks.push(t); if (!first) first = t;
+    }
+    renderTracks();
+    if (first) {
+      await playTrack(first);
+      if (!saved) setStatus('Çalıyor: ' + first.name + '. Bu tarayıcı dosyayı saklayamadı; liste yalnızca bu oturumda durur.', true);
+    }
+  }
+  $('addMusicBtn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const files = Array.from(fileInput.files || []);
+    fileInput.value = '';
+    if (files.length) addFiles(files);
   });
+  (async () => {
+    db = await openDb();
+    const all = await store('readonly', s => s.getAll());
+    if (Array.isArray(all)) { for (const r of all) tracks.push({ id: r.id, name: r.name, blob: r.blob }); renderTracks(); }
+  })();
 
   const fsBtn = $('fsBtn');
   if (!document.documentElement.requestFullscreen) fsBtn.hidden = true;
