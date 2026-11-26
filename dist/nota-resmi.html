@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nota Resmi · Umut Köse</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Gitarında çaldığın her nota bir fonksiyondan geçip kendi renginde bir eğri çizer; eğriler üst üste binerek bir resim oluşturur.">
+<link rel="canonical" href="https://umutkose-stack.github.io/matematik-atolyesi/nota-resmi.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Yerleşim: üstte ses kaynağı şeridi, solda tablo (tuval), sağda fonksiyon ve ayar paneli.
+     Tek tema: siyah tuval. Vurgu rengi, son çalınan notanın f(nota) rengidir. */
+  color-scheme: dark;
+  --stage:#05060a;
+  --panel:#0e1019;
+  --rule:#262a3d;
+  --text:#eceef8;
+  --muted:#8b90a9;
+  --note:#cfd3e6;
+  --display:"Unbounded","Avenir Next","Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Consolas,monospace;
+  --ui:system-ui,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{
+  background:var(--stage);color:var(--text);font:14px/1.4 var(--ui);
+  display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);overflow:hidden;
+}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+.bar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;
+  padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--rule);
+}
+.bar h1{margin:0;font:600 15px/1 var(--display);letter-spacing:.02em;white-space:nowrap}
+.bar h1 b{color:var(--note);font-weight:600}
+.home{color:var(--muted);font-size:13px;text-decoration:none;white-space:nowrap}
+.home:hover{color:var(--text);text-decoration:underline}
+.btn{
+  border:1px solid var(--rule);background:#151827;border-radius:999px;
+  padding:7px 14px;cursor:pointer;white-space:nowrap;
+}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--text);color:var(--stage);border-color:var(--text);font-weight:600}
+.btn.primary[aria-pressed="true"]{background:transparent;color:var(--text)}
+.btn.stop{border-color:#7a2f3a;color:#ffb3bd}
+.btn.stop:hover{border-color:#ff8090}
+.strings{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.label{color:var(--muted);font-size:12px;margin-right:2px}
+.str{
+  border:1px solid var(--rule);background:#151827;border-radius:8px;cursor:pointer;
+  padding:5px 9px 4px;font:600 12px/1.2 var(--mono);border-bottom:3px solid var(--c,var(--rule));
+}
+.str:hover{background:#1c2033}
+.str:active{transform:translateY(1px)}
+.str.math{font-size:13px;min-width:34px;border-bottom-color:var(--muted)}
+.spacer{flex:1 1 0}
+
+.work{display:grid;grid-template-columns:minmax(0,1fr) 356px;min-height:0}
+.stage{position:relative;min-height:0;min-width:0;overflow:hidden}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#axis{pointer-events:none}
+.readout{
+  display:grid;gap:8px;padding:11px 12px;border-radius:10px;
+  background:var(--stage);border:1px solid var(--rule);
+}
+.rgb{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px 12px;
+  font:600 14px/1.25 var(--mono);font-variant-numeric:tabular-nums;white-space:pre}
+.swatch{grid-row:span 2;width:44px;height:44px;border-radius:10px;background:var(--sw,#20222e);border:1px solid var(--rule)}
+#hexTxt{font-weight:400;font-size:11.5px;color:var(--muted)}
+.meta{display:grid;gap:3px;padding-top:8px;border-top:1px solid var(--rule);
+  font:400 11.5px/1.4 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.meta b{color:var(--text);font-weight:600}
+.live{display:flex;align-items:center;gap:8px}
+.live i{width:12px;height:12px;border-radius:3px;background:var(--lv,transparent);border:1px solid var(--rule);flex:none}
+.status{
+  position:absolute;left:16px;top:12px;width:min(300px,45%);margin:0;text-align:left;
+  color:var(--muted);font-size:13px;text-wrap:balance;pointer-events:none;
+  text-shadow:0 0 8px var(--stage),0 0 8px var(--stage);
+}
+.status.warn{color:#ffd08a}
+
+.panel{
+  background:var(--panel);border-left:1px solid var(--rule);
+  padding:14px 16px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;min-height:0;
+}
+.panel h2{margin:0 0 8px;font:600 11px/1 var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fn{
+  margin:0;display:grid;grid-template-columns:1fr auto;gap:5px 10px;
+  padding:11px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--stage);
+  font:400 11.5px/1.35 var(--mono);font-variant-numeric:tabular-nums;
+}
+.fn dt{color:#c3c7da;margin:0}
+.fn dd{margin:0;text-align:right;color:var(--text);font-weight:600}
+.fn .head{grid-column:1/-1;color:var(--text);font-weight:600;padding-bottom:5px;border-bottom:1px solid var(--rule)}
+.fn .out{color:var(--note)}
+.fn .wide{grid-column:1/-1}
+.fn dd.wide{font-size:13px}
+.desc{margin:10px 0 0;color:#c3c7da;font-size:13px;line-height:1.45}
+.legend{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:10px}
+.legend span{
+  border-radius:6px;padding:4px 0;text-align:center;font:600 11px/1.2 var(--mono);
+  background:var(--c);color:#06070c;
+}
+.modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.eq{margin:10px 0 0;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--stage);font:400 11.5px/1.4 var(--mono);color:var(--text)}
+.mode{
+  border:1px solid var(--rule);background:#151827;border-radius:10px;
+  padding:8px 6px;cursor:pointer;font-weight:600;text-align:center;font-size:13px;
+}
+.mode:hover{border-color:var(--muted)}
+.mode[aria-pressed="true"]{background:var(--text);color:var(--stage);border-color:var(--text)}
+.rows{display:grid;gap:14px}
+.row{display:grid;gap:6px}
+.row .top{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.row output{font:400 12px/1.5 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.row input[type=range]{width:100%;margin:0;accent-color:var(--note)}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--note);margin:0}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.actions .btn{border-radius:10px;text-align:center;padding:8px 6px}
+
+@media (max-width:860px){
+  html,body{height:auto;min-height:100%}
+  body{display:block;overflow:auto}
+  .work{grid-template-columns:minmax(0,1fr)}
+  .stage{height:62vh;min-height:340px}
+  .panel{border-left:0;border-top:1px solid var(--rule);overflow:visible}
+  .spacer{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="home" href="./">← Umut Köse</a>
+  <h1>Nota <b>Resmi</b></h1>
+  <button id="micBtn" class="btn primary" aria-pressed="false">Mikrofonu aç</button>
+  <button id="stopBtn" class="btn stop">■ Durdur</button>
+  <div class="strings" role="group" aria-label="Örnek sesler">
+    <span class="label">Örnek tel</span>
+    <button class="str" data-f="82.41">6 Mi</button>
+    <button class="str" data-f="110.00">5 La</button>
+    <button class="str" data-f="146.83">4 Re</button>
+    <button class="str" data-f="196.00">3 Sol</button>
+    <button class="str" data-f="246.94">2 Si</button>
+    <button class="str" data-f="329.63">1 Mi</button>
+    <span class="label" style="margin-left:8px">Örnek ezgi</span>
+    <button class="str" id="melBtn">Melodi</button>
+    <button class="str" id="chromBtn">Kromatik gam</button>
+    <button class="str" id="improBtn">Doğaçlama</button>
+    <button class="str" id="donBtn">Dönence tarzı</button>
+    <span class="label" style="margin-left:8px">Matematik çalsın</span>
+    <button class="str math" data-const="e" title="e sayısının ilk 100 basamağı">e</button>
+    <button class="str math" data-const="pi" title="π sayısının ilk 100 basamağı">π</button>
+    <button class="str math" data-const="sqrt2" title="√2 sayısının ilk 100 basamağı">√2</button>
+    <button class="str math" data-const="phi" title="Altın oranın ilk 100 basamağı">φ</button>
+  </div>
+  <span class="spacer"></span>
+  <button id="fileBtn" class="btn">Ses dosyası çal</button>
+  <input type="file" id="fileInput" accept="audio/*" hidden>
+  <button id="fsBtn" class="btn">Tam ekran</button>
+</header>
+
+<div class="work">
+  <main class="stage" id="stage">
+    <canvas id="fx"></canvas>
+    <canvas id="axis"></canvas>
+    <p class="status" id="status">Örnek resim gösteriliyor. Mikrofonu aç ve gitarında notaları tek tek çal; her nota kendi renginde bir eğri çizer.</p>
+  </main>
+
+  <aside class="panel">
+    <section>
+      <h2>Son nota</h2>
+      <div class="readout">
+      <div class="rgb">
+        <span class="swatch" id="swatch"></span>
+        <span id="rgbTxt">R   –  G   –  B   –</span>
+        <span id="hexTxt">henüz nota yok</span>
+      </div>
+      <div class="meta">
+        <span id="noteTxt">Son nota: <b>—</b></span>
+        <span class="live"><i id="liveSw"></i><span id="liveTxt">Şu an: sessiz</span></span>
+        <span id="countTxt">Resim: 0 nota</span>
+        <span id="covTxt">Ulaşılan renk hücresi: 0 / 4096</span>
+      </div>
+      </div>
+    </section>
+    <section>
+      <h2>Fonksiyon</h2>
+      <dl class="fn">
+        <div class="head">f(nota) = (R, G, B)</div>
+        <dt>m = 69 + 12·log₂(f / 440)</dt><dd id="fnM">—</dd>
+        <dt>H = 30°·(m mod 12) + 7,5°·(m − 40)/12</dt><dd id="fnH">—</dd>
+        <dt>S = 1 − log₂(q) / 3</dt><dd id="fnS">—</dd>
+        <dt>V = (L + 42) / 30</dt><dd id="fnV">—</dd>
+        <dt class="out wide">(R, G, B) = HSV→RGB(H, S, V)</dt><dd id="fnRGB" class="out wide">—</dd>
+      </dl>
+      <dl class="fn" style="margin-top:8px">
+        <div class="head">Aynı üç değer eğriyi de belirler</div>
+        <dt>yön φ = H</dt><dd id="fnPhi">—</dd>
+        <dt>boyut a = 0,18 + 0,82·V</dt><dd id="fnA">—</dd>
+        <dt>sivrilik p = 1 + 1,5·(1 − S)</dt><dd id="fnP">—</dd>
+      </dl>
+      <p class="desc">Girdiler: f notanın frekansı (Hz), q tınının parlaklığı (sesin etkin frekansının f'ye oranı; saf sinüste 1), L vuruş anındaki ses seviyesi (dB). Nota adı ana tonu ve eğrinin yönünü, tını doygunluğu ve sivriliği, vuruş şiddeti parlaklığı ve boyutu belirler. S ve V, [0, 1] aralığına kırpılır.</p>
+      <div class="legend" id="legend" aria-label="Nota adına göre renk tonu"></div>
+    </section>
+
+    <section>
+      <h2>Şekil</h2>
+      <div class="modes" id="shapeBtns">
+        <button class="mode" data-shape="cardioid" aria-pressed="true">Kardioid</button>
+        <button class="mode" data-shape="rose" aria-pressed="false">Yaprak</button>
+        <button class="mode" data-shape="epi" aria-pressed="false">Episikloid</button>
+        <button class="mode" data-shape="lemniscate" aria-pressed="false">Lemniskat</button>
+        <button class="mode" data-shape="ellipse" aria-pressed="false">Halka</button>
+        <button class="mode" data-shape="mixed" aria-pressed="false">Karışık</button>
+      </div>
+      <p class="eq" id="shapeEq"></p>
+      <p class="desc" id="shapeDesc"></p>
+    </section>
+
+    <section>
+      <h2>Yerleşim</h2>
+      <div class="modes" id="layoutBtns">
+        <button class="mode" data-layout="mandala" aria-pressed="true">Mandala</button>
+        <button class="mode" data-layout="spiral" aria-pressed="false">Spiral</button>
+        <button class="mode" data-layout="grid" aria-pressed="false">Izgara</button>
+      </div>
+      <p class="desc" id="layoutDesc"></p>
+    </section>
+
+    <section>
+      <h2>Ayarlar</h2>
+      <div class="rows">
+        <label class="check"><input type="checkbox" id="chkFill" checked> Eğrilerin içini saydam boya</label>
+        <div class="row" id="capRow" hidden>
+          <div class="top"><label for="sldCap">Tuval kapasitesi</label><output id="valCap">200 nota</output></div>
+          <input type="range" id="sldCap" min="50" max="2000" step="50" value="200">
+        </div>
+        <div class="row">
+          <div class="top"><label for="sldSens">Mikrofon hassasiyeti</label><output id="valSens">2.0×</output></div>
+          <input type="range" id="sldSens" min="0.5" max="8" step="0.1" value="2">
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tablo</h2>
+      <div class="actions">
+        <button class="btn" id="undoBtn">Geri al</button>
+        <button class="btn" id="clearBtn">Temizle</button>
+        <button class="btn" id="pngBtn">PNG indir</button>
+      </div>
+      <p class="desc">Şekli ya da yerleşimi değiştirmek resmi silmez; aynı notalar yeni kuralla baştan çizilir.</p>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const stage = $('stage');
+  const fx = $('fx'), g = fx.getContext('2d');
+  const axis = $('axis'), ga = axis.getContext('2d');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const TR = ['Do','Do♯','Re','Re♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
+  const EN = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const STRINGS = [82.41, 110.00, 146.83, 196.00, 246.94, 329.63];
+  const FFT = 8192, BG = [5, 6, 10];
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const hex = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const midiOf = f => 69 + 12 * Math.log2(f / 440);
+  const freqOf = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  /* ============ f(nota) = (R, G, B) ============ */
+  function hsv2rgb(h, s, v) {
+    h = ((h % 360) + 360) % 360;
+    const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+    const [r, g2, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return [Math.round((r + m) * 255), Math.round((g2 + m) * 255), Math.round((b + m) * 255)];
+  }
+  // m: MIDI perde değeri (kesirli olabilir), L: ses seviyesi (dB)
+  //    q: tını parlaklığı = etkin frekans / temel frekans (saf sinüste 1)
+  function noteFn(m, L, q) {
+    // Nota adı ana tonu verir (Do = 0°, her yarım ses 30°); her oktav tonu 7,5° kaydırır,
+    // böylece gitarın 49 perdesinin her biri ayrı bir tona düşer.
+    const H = (30 * (((m % 12) + 12) % 12) + 7.5 * (m - 40) / 12 + 360) % 360;
+    const S = clamp(1 - Math.log2(Math.max(q, 1)) / 3, 0, 1);   // yumuşak tını doygun, parlak tını soluk
+    const V = clamp((L + 42) / 30, 0, 1);                        // −42 dB siyah, −12 dB ve üstü tam parlak
+    return { H, S, V, c: hsv2rgb(H, S, V) };
+  }
+  function noteName(m) {
+    const n = Math.round(m), pc = ((n % 12) + 12) % 12;
+    return `${TR[pc]}${Math.floor(n / 12) - 1} (${EN[pc]}${Math.floor(n / 12) - 1})`;
+  }
+
+  $('legend').innerHTML = TR.map((n, i) => `<span style="--c:rgb(${hsv2rgb(i * 30 + 7.5, 0.85, 1)})">${n}</span>`).join('');
+  document.querySelectorAll('.str[data-f]').forEach(b => {
+    b.style.setProperty('--c', `rgb(${noteFn(midiOf(+b.dataset.f), -12, 1.25).c})`);
+  });
+
+  /* ============ Resim: notalar, eğriler, yerleşim ============ */
+  const notes = [];                 // { m, L, q, f, H, S, V, c, t }
+  let panelDirty = true, lastLive = 0, paintDirty = true;
+  const cov = new Uint8Array(4096); // RGB küpü 16×16×16 hücre
+  let covN = 0, example = true;
+  let layout = 'mandala', shape = 'cardioid', cap = 200, fillOn = true;
+
+  const SHAPES = {
+    cardioid: { eq: 'r(θ) = a · ((1 + cos(θ − φ)) / 2)^p',
+      desc: 'Her nota, sivri ucu merkezde duran bir kardioid çizer. Tam doygun notada p = 1 olur ve eğri tam kardioiddir; tını parlaklaştıkça yaprak incelir.' },
+    rose: { eq: 'r(θ) = a · |cos(n·(θ − φ) / 2)|^p,   n = 3 + oktav',
+      desc: 'Her nota n yapraklı bir gül eğrisi çizer. Yaprak sayısı oktavdan gelir: kalın notalar 3, ince notalar 7 yapraklıdır.' },
+    epi: { eq: 'z(t) = a·e^(iφ) · ((k+1)·e^(it) − e^(i(k+1)t)) / (k+2),   k = 1 + oktav',
+      desc: 'Her nota k sivri uçlu bir episikloid çizer: en kalın oktav kardioid (k = 1), bir üstü nefroid (k = 2), sonra 3, 4 ve 5 uçlu eğriler.' },
+    lemniscate: { eq: '(x, y) = a · (cos t, e·sin t·cos t) / (1 + sin² t),   e = 0,6 + 0,8·S',
+      desc: 'Her nota φ yönünde yatan bir lemniskat (sekiz) çizer; doygunluk halkaların genişliğini belirler.' },
+    ellipse: { eq: '(x, y) = a · (cos t, b·sin t),   b = 0,35 + 0,65·S',
+      desc: 'Her nota φ yönünde yatan bir halka çizer; tam doygun notada halka çemberdir, tını parlaklaştıkça basıklaşır.' },
+    mixed: { eq: 'şekil = nota adına göre: Do, Mi, Sol♯ → kardioid · Do♯, Fa, La → yaprak · …',
+      desc: 'Şekil türü nota adından seçilir (nota mod 5): kardioid, yaprak, episikloid, lemniskat, halka. Tek resimde beş eğri ailesi birlikte görünür.' }
+  };
+  const KINDS = ['cardioid', 'rose', 'epi', 'lemniscate', 'ellipse'];
+  const LAYOUTS = {
+    mandala: 'Bütün eğriler tuvalin merkezinden çıkar. Yön renk tonuyla aynı açıdır, bu yüzden renk çemberi resmin etrafına dizilir; sert vuruşlar dışa, yumuşak vuruşlar içe çizer.',
+    spiral: 'Her nota, çalınma sırasıyla merkezden dışa sarılan spiralde kendi küçük eğrisini çizer; ezgi spirali izleyerek okunur.',
+    grid: 'Her nota, soldan sağa ve yukarıdan aşağıya dolan ızgarada kendi hücresine bir eğri çizer.'
+  };
+
+  function mark(c) { const i = (c[0] >> 4) << 8 | (c[1] >> 4) << 4 | (c[2] >> 4); if (!cov[i]) { cov[i] = 1; covN++; } }
+  function recount() { cov.fill(0); covN = 0; for (const n of notes) mark(n.c); }
+  function addNote(m, L, q, now) {
+    if (notes.length >= 20000) return;
+    const o = noteFn(m, L, q);
+    const n = { m, L, q, f: freqOf(m), H: o.H, S: o.S, V: o.V, c: o.c, t: now };
+    notes.push(n);
+    mark(o.c);
+    panelDirty = true;
+    // Mandalada (ya da tuval dolmadıysa) yalnız yeni eğri eklenir; yoksa ölçek değişir, resim baştan çizilir
+    if (!paintDirty && W && (layout === 'mandala' || notes.length <= cap)) drawNote(g, n, notes.length - 1, Math.max(cap, notes.length), false);
+    else paintDirty = true;
+  }
+  function clearAll() { notes.length = 0; recount(); panelDirty = true; paintDirty = true; hasMicNotes = false; lastConst = ''; }
+
+  // Notanın eğrisi: birim boyutta, başlangıç noktasına göre. Yön φ = H, sivrilik p = 1 + 1,5·(1 − S).
+  const SN = 220, SX = new Float32Array(SN + 1), SY = new Float32Array(SN + 1);
+  function shapePath(n) {
+    const phi = n.H * Math.PI / 180, p = 1 + 1.5 * (1 - n.S), oct = clamp(Math.floor((n.m - 40) / 12), 0, 4);
+    const kind = shape === 'mixed' ? KINDS[((Math.round(n.m) % 5) + 5) % 5] : shape;
+    const c = Math.cos(phi), s = Math.sin(phi);
+    for (let i = 0; i <= SN; i++) {
+      const t = i / SN * Math.PI * 2;
+      let x, y;
+      if (kind === 'cardioid') { const r = Math.pow((1 + Math.cos(t)) / 2, p); x = r * Math.cos(t); y = r * Math.sin(t); }
+      else if (kind === 'rose') { const r = Math.pow(Math.abs(Math.cos((3 + oct) * t / 2)), p); x = r * Math.cos(t); y = r * Math.sin(t); }
+      else if (kind === 'epi') { const k = 1 + oct; x = ((k + 1) * Math.cos(t) - Math.cos((k + 1) * t)) / (k + 2); y = ((k + 1) * Math.sin(t) - Math.sin((k + 1) * t)) / (k + 2); }
+      else if (kind === 'lemniscate') { const d = 1 + Math.sin(t) * Math.sin(t); x = Math.cos(t) / d; y = (0.6 + 0.8 * n.S) * Math.sin(t) * Math.cos(t) / d; }
+      else { x = Math.cos(t); y = (0.35 + 0.65 * n.S) * Math.sin(t); }
+      SX[i] = x * c - y * s; SY[i] = x * s + y * c;
+    }
+  }
+  // i. notanın eğrisinin başlangıç noktası ve boyutu (birim koordinat): [x, y, a]
+  const A = [0, 0, 0];
+  function anchor(i, N, n) {
+    const v = n ? n.V : 1;
+    if (layout === 'spiral') {
+      const d = Math.sqrt(Math.PI / N) * 0.95, r = d * Math.sqrt((i + 0.5) / Math.PI), th = 2 * Math.sqrt(Math.PI * i);
+      A[0] = r * Math.cos(th); A[1] = r * Math.sin(th); A[2] = d * 0.66 * (0.4 + 0.6 * v);
+    } else if (layout === 'grid') {
+      const cols = Math.ceil(Math.sqrt(N)), cell = 1.9 / cols;
+      A[0] = -0.95 + (i % cols + 0.5) * cell; A[1] = 0.95 - (Math.floor(i / cols) + 0.5) * cell; A[2] = cell * 0.5 * (0.4 + 0.6 * v);
+    } else { A[0] = 0; A[1] = 0; A[2] = 0.18 + 0.82 * v; }
+    return A;
+  }
+
+  /* ============ Tuval ============ */
+  let W = 0, H = 0, dpr = 1, cx0 = 0, cy0 = 0, size = 0, unit = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = stage.clientWidth; H = stage.clientHeight;
+    for (const c of [fx, axis]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    cx0 = W / 2; cy0 = H / 2; size = Math.min(W, H); unit = size * 0.44;
+    paintDirty = true;
+  }
+  new ResizeObserver(resize).observe(stage);
+
+  // Bir notanın eğrisini çizer. glow verilirse (0–1) yalnızca parlak bir kontur çizilir (yeni nota vurgusu).
+  function drawNote(c2, n, i, N, glow) {
+    const a0 = anchor(i, N, n), ox = cx0 + a0[0] * unit, oy = cy0 - a0[1] * unit, a = a0[2] * unit;
+    shapePath(n);
+    c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c2.beginPath();
+    for (let k = 0; k <= SN; k++) { const x = ox + SX[k] * a, y = oy - SY[k] * a; k ? c2.lineTo(x, y) : c2.moveTo(x, y); }
+    c2.closePath();
+    c2.lineJoin = 'round';
+    const lw = clamp(a * 0.011, 1, 3.2) * (0.7 + 0.5 * n.V);
+    if (glow) {
+      c2.strokeStyle = `rgba(255,255,255,${(glow * 0.9).toFixed(2)})`; c2.lineWidth = lw + 2.5 * glow; c2.stroke();
+    } else {
+      if (fillOn) { c2.fillStyle = `rgba(${n.c},0.13)`; c2.fill(); }
+      c2.strokeStyle = `rgba(${n.c},0.95)`; c2.lineWidth = lw; c2.stroke();
+    }
+  }
+  function repaint() {
+    paintDirty = false;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = `rgb(${BG})`; g.fillRect(0, 0, W, H);
+    const N = Math.max(cap, notes.length);
+    for (let i = 0; i < notes.length; i++) drawNote(g, notes[i], i, N, false);
+  }
+
+  /* ============ Ses ============ */
+  let ctx = null, analyser = null, input = null, micStream = null, micNode = null, fileSrc = null;
+  let live = false, sens = 2, mathSeq = null, hasMicNotes = false, lastConst = '';
+  const voices = [];
+  const timeBuf = new Float32Array(FFT);
+  const freqBuf = new Float32Array(FFT / 2).fill(-120);
+  const statusEl = $('status'), micBtn = $('micBtn'), fileBtn = $('fileBtn'), fileInput = $('fileInput');
+  function setStatus(t, warn) { statusEl.textContent = t; statusEl.classList.toggle('warn', !!warn); }
+
+  function ensureAudio() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { setStatus('Bu tarayıcı ses işlemeyi desteklemiyor. Dosyayı Chrome, Edge ya da Firefox ile aç.', true); return false; }
+      ctx = new AC();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = FFT; analyser.smoothingTimeConstant = 0.5;
+      input = ctx.createGain(); input.gain.value = sens;
+      input.connect(analyser);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    live = true;
+    if (example) { example = false; clearAll(); }   // örnek resmi kaldır, kullanıcının resmi başlasın
+    return true;
+  }
+
+  async function toggleMic() {
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micNode.disconnect(); micStream = micNode = null;
+      micBtn.textContent = 'Mikrofonu aç'; micBtn.setAttribute('aria-pressed', 'false');
+      setStatus('Mikrofon kapalı. Resmin duruyor; örnek teller çalışmaya devam eder.');
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('Bu pencere mikrofona erişemiyor. Dosyayı indirip Chrome, Edge ya da Firefox ile aç. Örnek teller burada da çalışır.', true);
+      return;
+    }
+    try {
+      // Gitar için tarayıcının konuşma filtreleri kapalı olmalı, yoksa uzayan notayı gürültü sanıp keser.
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+      if (!ensureAudio()) { s.getTracks().forEach(t => t.stop()); return; }
+      micStream = s;
+      micNode = ctx.createMediaStreamSource(s);
+      micNode.connect(input);
+      micBtn.textContent = 'Mikrofonu kapat'; micBtn.setAttribute('aria-pressed', 'true');
+      setStatus('Mikrofon açık. Notaları tek tek çal; her nota bir eğri çizer.');
+    } catch (e) {
+      const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+      setStatus(denied
+        ? 'Mikrofona izin verilmedi. Adres çubuğundaki mikrofon simgesinden izin ver ve yeniden dene. Bu pencerede izin çıkmıyorsa dosyayı indirip tarayıcıda aç.'
+        : 'Mikrofon bulunamadı. Bir mikrofon bağlı mı kontrol et. Örnek teller mikrofonsuz da çalışır.', true);
+    }
+  }
+  micBtn.addEventListener('click', toggleMic);
+
+  // Örnek tel: Karplus-Strong. vel vuruş şiddeti (0–1), stopAfter verilirse nota o kadar saniye sonra susar.
+  function silenceVoices() {
+    mathSeq = null;
+    const t = ctx.currentTime;
+    for (const v of voices.splice(0)) {
+      v.g1.gain.cancelScheduledValues(t); v.g2.gain.cancelScheduledValues(t);
+      v.g1.gain.setTargetAtTime(0, t, 0.015); v.g2.gain.setTargetAtTime(0, t, 0.015);
+      try { v.src.stop(t + 0.15); } catch (_) {}
+    }
+  }
+  function pluck(freq, delay, vel, stopAfter, pos, beta) {
+    pos = pos || 0.2; beta = beta === undefined ? 0.03 : beta;
+    const fs = ctx.sampleRate, len = Math.floor(fs * (stopAfter ? Math.min(3.5, stopAfter + 0.2) : 3.5));
+    const buf = ctx.createBuffer(1, len, fs), d = buf.getChannelData(0);
+    const N = Math.round(fs / freq), decay = Math.exp(-6.91 / (freq * 6));
+    // Başlangıç şekli, pos noktasından çekilmiş telin üçgeni: köprüye yakın çekiş (küçük pos) daha parlak tını verir
+    for (let i = 0; i < N; i++) {
+      const x = i / N, tri = x < pos ? x / pos : (1 - x) / (1 - pos);
+      d[i] = (tri - 0.5) * 1.7 * (1 - beta) + (Math.random() * 2 - 1) * beta * 1.1;   // β: tınıdaki parlak, telli bileşen
+    }
+    for (let i = N; i < len; i++) d[i] = decay * 0.5 * (d[i - N] + d[i - N + 1]);
+    const t0 = ctx.currentTime + (delay || 0);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const g1 = ctx.createGain(); g1.gain.value = 0.35 * vel;
+    const g2 = ctx.createGain(); g2.gain.value = 0.5 * vel / sens;   // örnek ses hassasiyet ayarından etkilenmesin
+    src.connect(g1); g1.connect(ctx.destination);
+    src.connect(g2); g2.connect(input);
+    if (stopAfter) { g1.gain.setTargetAtTime(0, t0 + stopAfter, 0.012); g2.gain.setTargetAtTime(0, t0 + stopAfter, 0.012); }
+    const v = { src, g1, g2 }; voices.push(v);
+    src.onended = () => { const i = voices.indexOf(v); if (i >= 0) voices.splice(i, 1); };
+    src.start(t0);
+  }
+  function playString(f) {
+    if (!ensureAudio()) return;
+    silenceVoices(); pluck(f, 0, 1);
+    if (!micStream) setStatus('Örnek tel çalındı: resme bir eğri eklendi. Kendi gitarın için mikrofonu aç.');
+  }
+  // Tek sesli ezgi: her nota, sıradaki başlarken susar
+  function playSeq(midis, step, velFn, betaFn, msg) {
+    if (!ensureAudio()) return;
+    silenceVoices();
+    midis.forEach((m, i) => pluck(freqOf(m), i * step, velFn(i), step, 0.2, betaFn(i)));
+    if (!micStream) setStatus(msg);
+  }
+  document.querySelectorAll('.str[data-f]').forEach(b => b.addEventListener('click', () => playString(+b.dataset.f)));
+  $('melBtn').addEventListener('click', () => playSeq(
+    [40,43,45,47,50,52,55,57,59,62,64,67,69,71,74,76,74,71,69,67,64,62,59,57,55,52,50,47,45,43,40],
+    0.3, i => 0.2 + 0.8 * Math.abs(Math.sin(i * 0.33 + 0.5)), i => 0.55 * Math.abs(Math.sin(i * 0.21)),
+    'Örnek melodi çalıyor: yumuşak vuruşlar küçük ve koyu, sert vuruşlar büyük ve parlak eğri çizer.'));
+  $('chromBtn').addEventListener('click', () => playSeq(
+    Array.from({ length: 45 }, (_, i) => 40 + i),
+    0.24, i => 0.3 + 0.7 * ((i % 9) / 8), () => 0.03,
+    'Kromatik gam çalıyor: kalın Mi’den Do6’ya 45 yarım ses, renk çemberini dört kez dolanır.'));
+  $('improBtn').addEventListener('click', () => {
+    let m = 52;
+    const seq = Array.from({ length: 100 }, () => (m = clamp(m + [-7, -5, -3, -2, -2, -1, 1, 2, 2, 3, 5, 7][Math.floor(Math.random() * 12)], 40, 84)));
+    playSeq(seq, 0.26, () => 0.15 + 0.85 * Math.random(), () => 0.7 * Math.random() * Math.random(),
+      'Doğaçlama çalıyor: rastgele notalar; perde, vuruş şiddeti ve tını her notada değişir.');
+  });
+  /* Matematik çalsın: bir sabitin basamakları ezgiye, ezgi resme dönüşür.
+     i. nota için üç ardışık basamak fonksiyonun üç girdisini verir:
+       perde  ← d_i     (Mi minör pentatonik dizinin d_i. notası; 0–4 alt oktav, 5–9 üst oktav)
+       şiddet ← d_(i+1) (V = 0,25 + 0,75·d/9)
+       tını   ← d_(i+2) (S = 1 − 0,75·d/9)
+     Bu notalar mikrofondan ölçülmez, doğrudan basamaklardan hesaplanır; böylece resim her seferinde aynı çıkar. */
+  const CONSTS = {
+    e:     { name: 'e',  digits: '271828182845904523536028747135266249775724709369995957496696762772407663035354759457138217852516642742' },
+    pi:    { name: 'π',  digits: '314159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798' },
+    sqrt2: { name: '√2', digits: '141421356237309504880168872420969807856967187537694807317667973799073247846210703885038753432764157273' },
+    phi:   { name: 'φ',  digits: '161803398874989484820458683436563811772030917980576286213544862270526046281890244970720720418939113748' }
+  };
+  const PENTA = [0, 3, 5, 7, 10];
+  function playConst(key) {
+    if (!ensureAudio()) return;
+    silenceVoices(); stopFile();
+    const kept = hasMicNotes;
+    if (!kept) clearAll();
+    const D = CONSTS[key].digits, step = 0.26, list = [], t0 = ctx.currentTime + 0.08;
+    for (let i = 0; i + 2 < D.length; i++) {
+      const d0 = +D[i], d1 = +D[i + 1], d2 = +D[i + 2];
+      const m = 40 + 12 * Math.floor(d0 / 5) + PENTA[d0 % 5];
+      const V = 0.25 + 0.75 * d1 / 9, S = 1 - 0.75 * d2 / 9;
+      list.push({ t: i * step, m, L: -42 + 30 * V, q: Math.pow(2, 3 * (1 - S)), d: d0 });
+      pluck(freqOf(m), t0 + i * step - ctx.currentTime, V, step, 0.2, 0.6 * d2 / 9);
+    }
+    mathSeq = { key, list, t0, i: 0, kept };
+    if (!kept) lastConst = key;
+    setStatus(`${CONSTS[key].name} çalıyor…`);
+  }
+  document.querySelectorAll('.str[data-const]').forEach(b => b.addEventListener('click', () => playConst(b.dataset.const)));
+  function stepMath(now) {
+    const q = mathSeq, tn = ctx.currentTime - q.t0, name = CONSTS[q.key].name;
+    while (q.i < q.list.length && tn >= q.list[q.i].t + 0.02) {
+      const n = q.list[q.i]; addNote(n.m, n.L, n.q, now); q.i++;
+      setStatus(`${name} = ${CONSTS[q.key].digits[0]},${CONSTS[q.key].digits.slice(1, 12)}…   ${q.i}. basamak: ${n.d} → ${noteName(n.m)}`);
+    }
+    if (q.i >= q.list.length && tn > q.list[q.list.length - 1].t + 0.7) {
+      mathSeq = null;
+      setStatus(q.kept
+        ? `${name} bitti: ${q.list.length} nota mevcut resminin üstüne eklendi. Yalnız ${name} resmini görmek için önce Temizle'ye bas.`
+        : `${name} sayısının resmi tamam: ilk ${q.list.length} basamak, ${q.list.length} eğri.`);
+    }
+  }
+
+  // "Dönence tarzı": şarkının kendisi değil, o havada dört bölümlük özgün bir parça (bas yürüyüşü, arpej, solo, kapanış).
+  // Notalar kullanıcının gönderdiği stüdyo dosyasındaki "Dönence Tarzı Demo"dan alınmıştır.
+  const DONENCE = (() => {
+    const sc = []; let t = 0;
+    [82.41, 82.41, 98, 82.41, 110, 98, 87.31, 82.41, 82.41, 82.41, 123.47, 110, 98, 87.31, 82.41, 82.41]
+      .forEach((f, i) => { sc.push({ f, t, v: i % 4 ? 0.45 : 0.65, b: 0.02 }); t += 0.3125; });
+    [329.63, 392, 493.88, 659.25, 493.88, 392, 329.63, 440, 349.23, 440, 523.25, 659.25, 523.25, 440, 392, 329.63, 293.66, 392, 493.88, 587.33, 493.88, 392, 329.63, 493.88]
+      .forEach((f, i) => { sc.push({ f, t, v: 0.5 + 0.3 * Math.pow(Math.sin(i * 0.4), 2), b: 0.15 }); t += 0.25; });
+    [[329.63, 0.65], [392, 0.45], [440, 0.55], [493.88, 0.7], [523.25, 0.45], [493.88, 0.4], [440, 0.45], [392, 0.45], [349.23, 0.4], [659.25, 0.9]]
+      .forEach(([f, d], i) => { sc.push({ f, t, v: 0.8 + 0.2 * i / 9, b: 0.5 }); t += d; });
+    [82.41, 98, 87.31, 82.41, 123.47, 110, 98, 82.41]
+      .forEach((f, i) => { sc.push({ f, t, v: Math.max(0.22, 0.55 * (1 - i / 9)), b: 0.02 }); t += 0.42; });
+    return sc;
+  })();
+  $('donBtn').addEventListener('click', () => {
+    if (!ensureAudio()) return;
+    silenceVoices();
+    DONENCE.forEach((n, i) => pluck(n.f, n.t, n.v, DONENCE[i + 1] ? DONENCE[i + 1].t - n.t : 1.8, 0.2, n.b));
+    if (!micStream) setStatus('Dönence tarzı özgün parça çalıyor: bas yürüyüşü, arpej, solo ve kapanış. Şarkının kendisi için kendi ses dosyanı "Ses dosyası çal" ile yükle.');
+  });
+  // Durdur: çalan ve sıraya alınmış bütün örnek sesleri ve ses dosyasını keser. Mikrofona ve resme dokunmaz.
+  function stopAll() {
+    if (ctx) silenceVoices();
+    const hadFile = !!fileSrc;
+    if (hadFile) stopFile();
+    setStatus('Çalan ses durduruldu. Resmin olduğu gibi duruyor.');
+  }
+  $('stopBtn').addEventListener('click', stopAll);
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape') { stopAll(); return; }
+    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    const n = '654321'.indexOf(e.key);       // tel numarası: 6 = kalın Mi
+    if (n >= 0) playString(STRINGS[n]);
+  });
+
+  // Ses dosyası
+  function stopFile() {
+    if (fileSrc) { try { fileSrc.stop(); } catch (_) {} fileSrc = null; }
+    fileBtn.textContent = 'Ses dosyası çal';
+  }
+  fileBtn.addEventListener('click', () => { if (fileSrc) { stopFile(); setStatus('Dosya durduruldu.'); } else fileInput.click(); });
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    if (!f || !ensureAudio()) return;
+    try {
+      setStatus('Dosya çözümleniyor…');
+      const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+      stopFile(); silenceVoices();
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const tap = ctx.createGain(); tap.gain.value = 1 / sens;
+      src.connect(ctx.destination); src.connect(tap); tap.connect(input);
+      src.onended = () => { if (fileSrc === src) { stopFile(); setStatus('Dosya bitti.'); } };
+      src.start(); fileSrc = src;
+      fileBtn.textContent = 'Dosyayı durdur';
+      setStatus('Çalıyor: ' + f.name);
+    } catch (_) {
+      setStatus('Bu dosya çözümlenemedi. MP3, WAV, M4A ya da OGG dene.', true);
+    }
+  });
+
+  const fsBtn = $('fsBtn');
+  if (!document.documentElement.requestFullscreen) fsBtn.hidden = true;
+  fsBtn.addEventListener('click', () => {
+    const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    if (p && p.catch) p.catch(() => setStatus('Tam ekran bu pencerede açılamadı.', true));
+  });
+  document.addEventListener('fullscreenchange', () => {
+    fsBtn.textContent = document.fullscreenElement ? 'Tam ekrandan çık' : 'Tam ekran';
+  });
+
+  /* ============ Perde bulma (YIN) ============ */
+  const YW = 2048, cmnd = new Float32Array(2048);
+  function detectPitch(x, fs) {
+    const tMax = Math.min(cmnd.length - 2, Math.floor(fs / 62));
+    const tMin = Math.max(2, Math.floor(fs / 1500));
+    const off = x.length - YW - tMax - 2;
+    let run = 0;
+    cmnd[0] = 1;
+    for (let t = 1; t <= tMax; t++) {
+      let s = 0;
+      for (let i = 0; i < YW; i += 2) { const d = x[off + i] - x[off + i + t]; s += d * d; }
+      run += s;
+      cmnd[t] = run > 0 ? s * t / run : 1;
+    }
+    let best = -1;
+    for (let t = tMin; t < tMax; t++) {
+      if (cmnd[t] < 0.12) { while (t + 1 < tMax && cmnd[t + 1] < cmnd[t]) t++; best = t; break; }
+    }
+    if (best < 0) {
+      let m = 1;
+      for (let t = tMin; t < tMax; t++) if (cmnd[t] < m) { m = cmnd[t]; best = t; }
+      if (m > 0.3 || best < 0) return 0;
+    }
+    const a = cmnd[best - 1], b = cmnd[best], c = cmnd[best + 1], den = a - 2 * b + c;
+    return fs / (best + (den ? clamp(0.5 * (a - c) / den, -1, 1) : 0));
+  }
+  // Tını: sesin etkin (karekök-ortalama) frekansı. Türevin enerjisi / sinyalin enerjisi, saf sinüste tam f verir;
+  // armonikler arttıkça yükselir. Önce 8 örneklik ortalama alınır ki mikrofon hışırtısı ölçümü şişirmesin.
+  function effectiveFreq(fs) {
+    let sy = 0, sd = 0, prev = 0, first = true;
+    for (let i = FFT - 2048; i + 8 <= FFT; i += 4) {
+      let y = 0;
+      for (let j = 0; j < 8; j++) y += timeBuf[i + j];
+      if (!first) { const d = y - prev; sd += d * d; }
+      sy += y * y; prev = y; first = false;
+    }
+    if (sy <= 0) return 0;
+    return (fs / 4) / Math.PI * Math.asin(Math.min(1, Math.sqrt(sd / sy) / 2));
+  }
+  // Tek perde bulunamazsa (akor gibi): spektrumun en güçlü tepesi
+  function spectralPeak(fs) {
+    const binHz = fs / FFT, k1 = Math.floor(1500 / binHz);
+    let kb = 0, vb = -60;
+    for (let k = Math.ceil(70 / binHz); k <= k1; k++) if (freqBuf[k] > vb) { vb = freqBuf[k]; kb = k; }
+    return kb ? kb * binHz : 0;
+  }
+
+  /* ============ Nota yakalama: her vuruş bir nota ============ */
+  const GATE = 0.006;
+  let envSlow = 0, lastOnset = -1e9, pend = null, curM = null, candM = 0, candSince = 0;
+  let livePitch = 0, liveRms = 0, liveQ = 1;
+  const recent = [];
+  const median = a => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+
+  function analyse(now) {
+    const fs = ctx.sampleRate;
+    analyser.getFloatTimeDomainData(timeBuf); analyser.getFloatFrequencyData(freqBuf);
+    let s1 = 0, s2 = 0;
+    for (let i = FFT - 2048; i < FFT; i++) s1 += timeBuf[i] * timeBuf[i];
+    for (let i = FFT - 512; i < FFT; i++) s2 += timeBuf[i] * timeBuf[i];
+    const rms = Math.sqrt(s1 / 2048), rmsShort = Math.sqrt(s2 / 512), active = rms > GATE;
+    const f = active ? detectPitch(timeBuf, fs) : 0;
+    if (f) { recent.push(f); if (recent.length > 5) recent.shift(); } else if (!active) recent.length = 0;
+    const pitch = recent.length >= 2 ? median(recent) : 0;
+    livePitch = pitch; liveRms = rms; liveQ = pitch ? effectiveFreq(fs) / pitch : 1;
+    if (mathSeq) { pend = null; candSince = 0; return; }
+
+    // Vuruş: kısa pencere enerjisi, yavaş zarfın belirgin üstüne çıkarsa
+    const onset = rmsShort > Math.max(GATE * 2.5, envSlow * 1.8) && now - lastOnset > 130;
+    envSlow = envSlow * 0.86 + rmsShort * 0.14;
+    if (onset) { pend = { t: now, peak: rmsShort, ps: [] }; lastOnset = now; }
+
+    if (pend) {
+      if (rmsShort > pend.peak) pend.peak = rmsShort;
+      // Perde penceresi yeni notayla dolsun diye ilk 60 ms beklenir, 115 ms'de nota tabloya işlenir
+      if (now - pend.t > 60 && f) pend.ps.push(f);
+      if (now - pend.t > 115) {
+        const pf = median(pend.ps) || spectralPeak(fs);
+        if (pf) { const m = midiOf(pf); addNote(m, 20 * Math.log10(Math.max(pend.peak, 1e-5)), effectiveFreq(fs) / pf, now); curM = m; if (micStream) hasMicNotes = true; }
+        pend = null; candSince = 0;
+      }
+    } else if (active && pitch && rms > GATE * 3) {
+      // Vuruşsuz perde değişimi (çekiç, kaydırma, kayıttaki bağlı notalar): 90 ms kararlıysa yeni nota
+      const m = midiOf(pitch);
+      if (curM === null || Math.abs(m - curM) > 0.6) {
+        if (candSince && Math.abs(m - candM) < 0.4) {
+          if (now - candSince > 90) { addNote(m, 20 * Math.log10(rmsShort), effectiveFreq(fs) / pitch, now); curM = m; candSince = 0; }
+        } else { candM = m; candSince = now; }
+      } else candSince = 0;
+    }
+    if (!active) { curM = null; candSince = 0; }
+  }
+
+  /* ============ Örnek tablo (mikrofon açılmadan önce) ============ */
+  (function seedExample() {
+    let s = 7, m = 52;
+    const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    for (let i = 0; i < 64; i++) {
+      m = clamp(m + [-5, -3, -2, -2, 2, 2, 3, 5, 7, -7][Math.floor(rnd() * 10)], 40, 79);
+      addNote(m, -40 + 28 * Math.abs(Math.sin(i * 0.11)) + rnd() * 6, Math.pow(2, 2.6 * rnd() * rnd()), -1e6);
+    }
+  })();
+
+  /* ============ Paneller ============ */
+  const el = { sw: $('swatch'), rgb: $('rgbTxt'), hex: $('hexTxt'), note: $('noteTxt'), count: $('countTxt'), cov: $('covTxt'),
+               liveSw: $('liveSw'), live: $('liveTxt'), phi: $('fnPhi'), a: $('fnA'), p: $('fnP'), m: $('fnM'), h: $('fnH'), s: $('fnS'), v: $('fnV'), out: $('fnRGB') };
+  const tr = (x, d) => x.toFixed(d).replace('.', ',');
+  function updatePanel() {
+    panelDirty = false;
+    const n = notes[notes.length - 1];
+    el.count.textContent = `Resim: ${notes.length} nota` + (example ? ' (örnek)' : '');
+    el.cov.textContent = `Ulaşılan renk hücresi: ${covN} / 4096`;
+    if (!n) {
+      el.sw.style.setProperty('--sw', '#20222e');
+      el.rgb.textContent = 'R   –  G   –  B   –'; el.hex.textContent = 'henüz nota yok';
+      el.note.innerHTML = 'Son nota: <b>—</b>';
+      for (const k of ['m', 'h', 's', 'v', 'out', 'phi', 'a', 'p']) el[k].textContent = '—';
+      return;
+    }
+    const c = n.c;
+    el.sw.style.setProperty('--sw', `rgb(${c})`);
+    el.rgb.textContent = `R ${String(c[0]).padStart(3)}  G ${String(c[1]).padStart(3)}  B ${String(c[2]).padStart(3)}`;
+    el.hex.textContent = `${hex(c)}  ·  rgb(${c.join(', ')})`;
+    el.note.innerHTML = `Son nota: <b>${noteName(n.m)}</b> · ${tr(n.f, 1)} Hz · q ${tr(n.q, 2)} · ${tr(n.L, 0).replace('-', '−')} dB`;
+    el.m.textContent = tr(n.m, 2);
+    el.h.textContent = tr(n.H, 0) + '°';
+    el.s.textContent = tr(n.S, 2);
+    el.v.textContent = tr(n.V, 2);
+    el.out.textContent = `(${c.join(', ')})`;
+    el.phi.textContent = tr(n.H, 0) + '°'; el.a.textContent = tr(0.18 + 0.82 * n.V, 2); el.p.textContent = tr(1 + 1.5 * (1 - n.S), 2);
+    const mx = Math.max(c[0], c[1], c[2], 1), k = Math.max(1, 200 / mx);
+    document.documentElement.style.setProperty('--note', `rgb(${c.map(v => Math.min(255, Math.round(v * k) + 30))})`);
+  }
+  function updateLive(now) {
+    if (now - lastLive < 120) return;
+    lastLive = now;
+    if (live && livePitch && liveRms > GATE) {
+      const m = midiOf(livePitch), o = noteFn(m, 20 * Math.log10(liveRms), liveQ);
+      el.liveSw.style.setProperty('--lv', `rgb(${o.c})`);
+      el.live.textContent = `Şu an: ${noteName(m)}`;
+    } else {
+      el.liveSw.style.setProperty('--lv', 'transparent');
+      el.live.textContent = live ? 'Şu an: sessiz' : 'Şu an: ses kaynağı kapalı';
+    }
+  }
+
+  /* ============ Çizim döngüsü ============ */
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!W || !H) return;
+    if (live) analyse(now);
+    if (mathSeq) stepMath(now);
+    if (paintDirty) repaint();
+    if (panelDirty) updatePanel();
+    updateLive(now);
+
+    // Üst katman: mandalada renk çemberi kılavuzu, yeni notanın vurgusu, sıradaki hücre
+    ga.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ga.clearRect(0, 0, W, H);
+    const N = Math.max(cap, notes.length);
+    if (layout === 'mandala') {
+      ga.strokeStyle = 'rgba(139,144,169,.16)'; ga.lineWidth = 1;
+      ga.beginPath(); ga.arc(cx0, cy0, unit, 0, Math.PI * 2); ga.stroke();
+      ga.font = '600 11px "JetBrains Mono", ui-monospace, Consolas, monospace';
+      ga.textAlign = 'center'; ga.textBaseline = 'middle';
+      for (let pc = 0; pc < 12; pc++) {
+        const ang = (pc * 30 + 7.5) * Math.PI / 180, r = unit + 16;
+        ga.fillStyle = `rgba(${hsv2rgb(pc * 30 + 7.5, 0.8, 1)},.9)`;
+        ga.fillText(TR[pc], cx0 + r * Math.cos(ang), cy0 - r * Math.sin(ang));
+      }
+    } else if (!example) {
+      const a0 = anchor(notes.length, Math.max(cap, notes.length + 1), null);
+      ga.strokeStyle = `rgba(139,144,169,${(0.4 + 0.3 * Math.sin(now / 300)).toFixed(2)})`; ga.lineWidth = 1;
+      ga.setLineDash([3, 3]);
+      ga.beginPath(); ga.arc(cx0 + a0[0] * unit, cy0 - a0[1] * unit, Math.max(3, a0[2] * unit * 0.5), 0, Math.PI * 2); ga.stroke();
+      ga.setLineDash([]);
+    }
+    if (!reduceMotion) {
+      for (let i = notes.length - 1; i >= 0 && i >= notes.length - 6; i--) {
+        const age = now - notes[i].t;
+        if (age < 700) drawNote(ga, notes[i], i, N, 1 - age / 700);
+      }
+    }
+  }
+
+  /* ============ Panel bağlantıları ============ */
+  function setShape(sh) {
+    shape = sh;
+    document.querySelectorAll('#shapeBtns .mode').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.shape === sh)));
+    $('shapeEq').textContent = SHAPES[sh].eq; $('shapeDesc').textContent = SHAPES[sh].desc;
+    paintDirty = true;
+  }
+  function setLayout(l) {
+    layout = l;
+    document.querySelectorAll('#layoutBtns .mode').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.layout === l)));
+    $('layoutDesc').textContent = LAYOUTS[l];
+    $('capRow').hidden = l === 'mandala';
+    paintDirty = true;
+  }
+  document.querySelectorAll('#shapeBtns .mode').forEach(b => b.addEventListener('click', () => setShape(b.dataset.shape)));
+  document.querySelectorAll('#layoutBtns .mode').forEach(b => b.addEventListener('click', () => setLayout(b.dataset.layout)));
+  $('chkFill').addEventListener('change', e => { fillOn = e.target.checked; paintDirty = true; });
+  $('sldCap').addEventListener('input', e => { cap = +e.target.value; $('valCap').textContent = cap + ' nota'; paintDirty = true; });
+  $('sldSens').addEventListener('input', e => { sens = +e.target.value; if (input) input.gain.value = sens; $('valSens').textContent = sens.toFixed(1) + '×'; });
+
+  $('undoBtn').addEventListener('click', () => {
+    if (!notes.length) return;
+    notes.pop(); recount(); panelDirty = true; paintDirty = true; setStatus('Son nota resimden çıkarıldı.');
+  });
+  $('clearBtn').addEventListener('click', () => { example = false; clearAll(); setStatus('Resim temizlendi.'); });
+  $('pngBtn').addEventListener('click', () => {
+    try {
+      if (paintDirty) repaint();
+      const a = document.createElement('a');
+      a.download = `nota-resmi-${lastConst ? lastConst + '-' : ''}${shape}-${new Date().toISOString().slice(0, 10)}.png`;
+      a.href = fx.toDataURL('image/png');
+      document.body.appendChild(a); a.click(); a.remove();
+      setStatus(`PNG hazırlandı (${fx.width}×${fx.height}, ${notes.length} nota).`);
+    } catch (_) { setStatus('PNG oluşturulamadı. Dosyayı tarayıcıda açıp yeniden dene.', true); }
+  });
+
+  resize();
+  setShape('cardioid');
+  setLayout('mandala');
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
