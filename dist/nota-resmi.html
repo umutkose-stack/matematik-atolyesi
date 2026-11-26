@@ -221,6 +221,7 @@ button,input{font:inherit;color:inherit}
         <span id="noteTxt">Son nota: <b>—</b></span>
         <span class="live"><i id="liveSw"></i><span id="liveTxt">Şu an: sessiz</span></span>
         <span id="countTxt">Resim: 0 nota</span>
+        <span id="hearTxt" title="Vuruş: sesin aniden yükseldiği anlar. Perdesiz: vuruş duyuldu ama net bir perde bulunamadığı için çizilmedi.">Duyulan vuruş: 0 · çizilen: 0 · perdesiz: 0</span>
         <span id="covTxt">Ulaşılan renk hücresi: 0 / 4096</span>
         <canvas id="palette" class="palette" aria-hidden="true"></canvas>
         <details class="help"><summary>Bu sayaç ne?</summary>RGB renk küpü her kanalda 16 basamağa bölünürse 16 × 16 × 16 = 4096 hücre eder. Sayaç, resimdeki renklerin bu hücrelerden kaçına düştüğünü gösterir; şerit o renkleri tona göre dizer.</details>
@@ -420,7 +421,7 @@ button,input{font:inherit;color:inherit}
     for (const n of notes) { n.S = satOf(n.q); n.c = hsv2rgb(n.H, n.S, n.V); }
     recount(); panelDirty = true; paintDirty = true;
   }
-  function clearAll() { notes.length = 0; recount(); panelDirty = true; paintDirty = true; hasMicNotes = false; lastConst = ''; picTitle = ''; }
+  function clearAll() { notes.length = 0; recount(); panelDirty = true; paintDirty = true; hasMicNotes = false; lastConst = ''; picTitle = ''; heard.onset = heard.drawn = heard.lost = 0; }
 
   // Notanın eğrisi: birim boyutta, başlangıç noktasına göre. Yön φ = H, sivrilik p = 1 + 1,5·(1 − S).
   const SN = 360, SX = new Float32Array(SN + 1), SY = new Float32Array(SN + 1), FX = new Float32Array(SN + 1), FY = new Float32Array(SN + 1);
@@ -501,6 +502,7 @@ button,input{font:inherit;color:inherit}
   }
 
   /* ============ Ses ============ */
+  let onsetAn = null;
   let ctx = null, analyser = null, input = null, micStream = null, micNode = null, fileSrc = null;
   let live = false, sens = 2, mathSeq = null, hasMicNotes = false, lastConst = '', picTitle = '', paused = false, onsetRatio = 1.8, minGap = 130;
   const voices = [];
@@ -518,6 +520,8 @@ button,input{font:inherit;color:inherit}
       analyser.fftSize = FFT; analyser.smoothingTimeConstant = 0.5;
       input = ctx.createGain(); input.gain.value = sens;
       input.connect(analyser);
+      onsetAn = ctx.createAnalyser(); onsetAn.fftSize = 2048; onsetAn.smoothingTimeConstant = 0;
+      input.connect(onsetAn);
     }
     // Duraklatılmışken başka bir ses başlatılırsa duraklatılan bırakılır, yenisi baştan çalar
     if (paused) { silenceVoices(); stopFile(); setPaused(false); }
@@ -824,6 +828,7 @@ button,input{font:inherit;color:inherit}
 
   /* ============ Perde bulma (YIN) ============ */
   const YW = 2048, cmnd = new Float32Array(2048);
+  let yinDip = 1;
   function detectPitch(x, fs) {
     const tMax = Math.min(cmnd.length - 2, Math.floor(fs / 62));
     const tMin = Math.max(2, Math.floor(fs / 1500));
@@ -846,6 +851,7 @@ button,input{font:inherit;color:inherit}
       if (m > 0.3 || best < 0) return 0;
     }
     const a = cmnd[best - 1], b = cmnd[best], c = cmnd[best + 1], den = a - 2 * b + c;
+    yinDip = b;   // 0'a yakınsa sinyal tek ve net bir periyoda sahiptir (tek ses)
     return fs / (best + (den ? clamp(0.5 * (a - c) / den, -1, 1) : 0));
   }
   // Tını: sesin etkin (karekök-ortalama) frekansı. Türevin enerjisi / sinyalin enerjisi, saf sinüste tam f verir;
@@ -886,10 +892,65 @@ button,input{font:inherit;color:inherit}
 
   /* ============ Nota yakalama: her vuruş bir nota ============ */
   const GATE = 0.006;
+  const heard = { onset: 0, drawn: 0, lost: 0 };   // duyulan vuruş, sesten çizilen nota, perdesi bulunamayan vuruş
   let envSlow = 0, lastOnset = -1e9, pend = null, curM = null, candM = 0, candSince = 0;
   let livePitch = 0, liveRms = 0, liveQ = 1;
   const recent = [];
   const median = a => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+
+  /* Vuruş ve perde, tınlayan notaların üstüne yeni nota geldiğinde de bulunabilsin diye spektrumdaki
+     "yeni gelen" enerjiye bakılır:
+     - Vuruş: kısa pencereli spektrumda, her kutunun son 70 ms'deki en büyük değerini aşan kısmın toplamı
+       (logaritmik genlik). Süren ya da vuruşan (beat yapan) sesler bu ölçüyü yükseltmez, yeni bir nota yükseltir.
+     - Perde: vuruştan hemen önceki spektrum ile 115 ms sonraki spektrumun farkı D yalnızca yeni notayı içerir;
+       perde D'nin armonik toplamından seçilir. Tek ses varken daha hassas olan periyot ölçümü (YIN) kullanılır. */
+  const MB = 1600;
+  const mainNow = new Float32Array(MB), pendRef = new Float32Array(MB), Dbuf = new Float32Array(MB);
+  const mainHist = Array.from({ length: 12 }, () => ({ t: -1e9, m: new Float32Array(MB) }));
+  const oDb = new Float32Array(1024), oF = new Float32Array(1024), oRef = new Float32Array(1024);
+  const oHist = Array.from({ length: 16 }, () => ({ t: -1e9, F: new Float32Array(1024) }));
+  let mainIdx = 0, oIdx = 0, lastRel = 0;
+  // Gerçek tepe: ana lob genişliği (±3 kutu) içinde en büyük değer. Güçlü bir tepenin etekleri tepe sayılmaz.
+  const isPeak = (M, b) => { if (b < 3 || b >= MB - 3) return false; for (let j = -3; j <= 3; j++) if (M[b + j] > M[b]) return false; return true; };
+  const dAt = (D, k) => (k >= 1 && k < MB - 1 ? Math.max(D[k - 1], D[k], D[k + 1]) : 0);
+  function harmSum(D, f, binHz) { let v = 0; for (let h = 1; h <= 6; h++) v += dAt(D, Math.round(h * f / binHz)) / Math.sqrt(h); return v; }
+  function pickFromD(D, binHz) {
+    const lo = Math.ceil(70 / binHz), hi = Math.min(MB - 2, Math.floor(1400 / binHz));
+    let mx = 0;
+    for (let b = lo; b < hi; b++) if (D[b] > mx) mx = D[b];
+    if (mx <= 1e-7) return 0;
+    let bestS = 0, bestF = 0;
+    for (let b = lo; b < hi; b++) {
+      if (D[b] < 0.25 * mx || D[b] < D[b - 1] || D[b] < D[b + 1]) continue;
+      // Aday, gerçek spektrumda da bir tepe olmalı; yoksa susan bir sesin yan loblarındaki artış nota sanılır
+      if (!(isPeak(mainNow, b) || isPeak(mainNow, b - 1) || isPeak(mainNow, b + 1))) continue;
+      const a = D[b - 1], c = D[b], e = D[b + 1], den = a - 2 * c + e, fb = (b + (den ? 0.5 * (a - e) / den : 0)) * binHz;
+      for (let div = 1; div <= 2; div++) {       // tepe, temel sesin kendisi ya da ikinci armoniği olabilir
+        const f = fb / div;
+        if (f < 70) continue;
+        const sc = harmSum(D, f, binHz) * (div === 2 ? 0.9 : 1);
+        if (sc > bestS * 1.05) { bestS = sc; bestF = f; }
+      }
+    }
+    return bestF;
+  }
+  const dbgLog = [];
+  function decidePitch(D, pf, clean, fs) {
+    const binHz = fs / FFT, fD = pickFromD(D, binHz);
+    // Yeni gelen enerjinin payı: küçükse D güvenilmezdir
+    let sd = 0, sm = 0;
+    for (let b = Math.ceil(70 / binHz); b < MB; b++) { sd += D[b]; sm += mainNow[b]; }
+    const share = sm > 0 ? sd / sm : 0;
+    let r;
+    if (!fD) r = pf;
+    else if (!pf) r = fD;
+    else if (Math.abs(12 * Math.log2(pf / fD)) < 0.35) r = pf;           // aynı nota: periyot ölçümü daha hassas
+    else if (clean && Math.abs(pf - fD) < 1.6 * binHz) r = pf;           // tek ses var ve D'nin tepesi komşu kutuya kaymış
+    else r = share >= 0.2 ? fD : pf;                                     // çok sesli tınlamada yeni gelen enerjiye uyulur
+    const mm = f => (f ? +(69 + 12 * Math.log2(f / 440)).toFixed(2) : 0);
+    if (dbgLog.length < 2000) dbgLog.push([mm(pf), mm(fD), +share.toFixed(2), clean ? 1 : 0, mm(r)]);
+    return r;
+  }
 
   function analyse(now) {
     const fs = ctx.sampleRate;
@@ -902,31 +963,68 @@ button,input{font:inherit;color:inherit}
     if (f) { recent.push(f); if (recent.length > 5) recent.shift(); } else if (!active) recent.length = 0;
     const pitch = recent.length >= 2 ? median(recent) : 0;
     livePitch = pitch; liveRms = rms; liveQ = pitch ? effectiveFreq(fs) / pitch : 1;
-    if (mathSeq) { pend = null; candSince = 0; return; }
 
-    // Vuruş: kısa pencere enerjisi, yavaş zarfın belirgin üstüne çıkarsa
-    const onset = rmsShort > Math.max(GATE * 2.5, envSlow * onsetRatio) && now - lastOnset > minGap;
-    envSlow = envSlow * 0.86 + rmsShort * 0.14;
-    if (onset) { pend = { t: now, peak: rmsShort, ps: [] }; lastOnset = now; }
-
-    if (pend) {
-      if (rmsShort > pend.peak) pend.peak = rmsShort;
-      // Perde penceresi yeni notayla dolsun diye ilk 60 ms beklenir, 115 ms'de nota tabloya işlenir
-      if (now - pend.t > 60 && f) pend.ps.push(f);
-      if (now - pend.t > 115) {
-        const pf = median(pend.ps) || spectralPeak(fs);
-        if (pf) { const m = midiOf(pf); addNote(m, 20 * Math.log10(Math.max(pend.peak, 1e-5)), effectiveFreq(fs) / pf, now, harmonics(fs, pf)); curM = m; if (micStream) hasMicNotes = true; }
-        pend = null; candSince = 0;
-      }
-    } else if (active && pitch && rms > GATE * 3) {
-      // Vuruşsuz perde değişimi (çekiç, kaydırma, kayıttaki bağlı notalar): 90 ms kararlıysa yeni nota
-      const m = midiOf(pitch);
-      if (curM === null || Math.abs(m - curM) > 0.6) {
-        if (candSince && Math.abs(m - candM) < 0.4) {
-          if (now - candSince > 90) { addNote(m, 20 * Math.log10(rmsShort), effectiveFreq(fs) / pitch, now, harmonics(fs, pitch)); curM = m; candSince = 0; }
-        } else { candM = m; candSince = now; }
-      } else candSince = 0;
+    // Ana spektrum (doğrusal genlik) ve "yeni enerji" ölçüsü
+    for (let b = 0; b < MB; b++) mainNow[b] = Math.pow(10, Math.max(-140, freqBuf[b]) / 20);
+    onsetAn.getFloatFrequencyData(oDb);
+    const ob = fs / 2048, b0 = Math.max(1, Math.ceil(60 / ob)), b1 = Math.min(1022, Math.floor(5000 / ob));
+    for (let b = b0 - 1; b <= b1 + 1; b++) oF[b] = Math.log1p(400 * Math.pow(10, Math.max(-140, oDb[b]) / 20));
+    oRef.fill(0);
+    let nref = 0;
+    for (const h of oHist) {
+      const dt = now - h.t;
+      if (dt <= 0 || dt > 70) continue;
+      nref++;
+      for (let b = b0; b <= b1; b++) { const v = Math.max(h.F[b - 1], h.F[b], h.F[b + 1]); if (v > oRef[b]) oRef[b] = v; }
     }
+    let flux = 0, tot = 0;
+    for (let b = b0; b <= b1; b++) { const d = oF[b] - oRef[b]; if (d > 0) flux += d; tot += oF[b]; }
+    const rel = nref >= 2 && tot > 0 ? flux / tot : 0;
+    lastRel = rel;
+    const slot = oHist[oIdx]; slot.F.set(oF); slot.t = now; oIdx = (oIdx + 1) % oHist.length;
+    const prevMain = mainHist[(mainIdx + mainHist.length - 1) % mainHist.length];
+
+    if (mathSeq) { pend = null; candSince = 0; }
+    else {
+      // Vuruş: yeni enerji eşiği aşarsa, ya da (sessizlikten gelen notalar için) kısa pencere enerjisi yavaş zarfı aşarsa
+      const fluxThr = 0.045 * Math.pow(onsetRatio / 1.8, 2);
+      const onset = rmsShort > GATE * 2.5 && (rel > fluxThr || rmsShort > envSlow * onsetRatio) && now - lastOnset > minGap;
+      if (onset) { pend = { t: now, peak: rmsShort, ps: [], cl: [] }; pendRef.set(prevMain.m); lastOnset = now; heard.onset++; panelDirty = true; }
+
+      if (pend) {
+        if (rmsShort > pend.peak) pend.peak = rmsShort;
+        // Perde penceresi yeni notayla dolsun diye ilk 60 ms beklenir, 115 ms'de nota resme işlenir
+        const age = now - pend.t;
+        if (age > 60 && f) { pend.ps.push(f); pend.cl.push(yinDip); }
+        if (age > 115) {
+          for (let b = 0; b < MB; b++) { const d = mainNow[b] - pendRef[b]; Dbuf[b] = d > 0 ? d : 0; }
+          const pf = decidePitch(Dbuf, median(pend.ps), pend.cl.length > 0 && median(pend.cl) < 0.06, fs);
+          if (pf) {
+            const m = midiOf(pf);
+            addNote(m, 20 * Math.log10(Math.max(pend.peak, 1e-5)), effectiveFreq(fs) / pf, now, harmonics(fs, pf));
+            curM = m; heard.drawn++; if (micStream) hasMicNotes = true;
+            pend = null; candSince = 0;
+          } else if (age > 230) { heard.lost++; panelDirty = true; pend = null; candSince = 0; }   // perdesi bulunamadı: çizilmez
+        }
+      } else if (active && pitch && rms > GATE * 3 && f && yinDip < 0.08) {
+        // Vuruşsuz perde değişimi (çekiç, kaydırma, kayıttaki bağlı notalar): 90 ms kararlıysa ve o perdede enerji artıyorsa yeni nota.
+        // Yalnız tek ve net bir ses varken çalışır; enerji koşulu tınlayan eski bir notanın yeniden çizilmesini önler.
+        const m = midiOf(pitch);
+        if (curM === null || Math.abs(m - curM) > 0.6) {
+          if (candSince && Math.abs(m - candM) < 0.4) {
+            if (now - candSince > 90) {
+              let ago = prevMain;
+              for (const h of mainHist) if (Math.abs(now - h.t - 150) < Math.abs(now - ago.t - 150)) ago = h;
+              const k = Math.round(pitch / (fs / FFT));
+              if (dAt(mainNow, k) > 1.5 * dAt(ago.m, k) && (isPeak(mainNow, k) || isPeak(mainNow, k - 1) || isPeak(mainNow, k + 1))) { addNote(m, 20 * Math.log10(rmsShort), effectiveFreq(fs) / pitch, now, harmonics(fs, pitch)); curM = m; heard.drawn++; }
+              candSince = 0;
+            }
+          } else { candM = m; candSince = now; }
+        } else candSince = 0;
+      }
+    }
+    envSlow = envSlow * 0.86 + rmsShort * 0.14;
+    const ms = mainHist[mainIdx]; ms.m.set(mainNow); ms.t = now; mainIdx = (mainIdx + 1) % mainHist.length;
     if (!active) { curM = null; candSince = 0; }
   }
 
@@ -961,6 +1059,7 @@ button,input{font:inherit;color:inherit}
     const n = notes[notes.length - 1];
     el.count.textContent = `Resim: ${notes.length} nota` + (example ? ' (örnek)' : '');
     el.cov.textContent = `Ulaşılan renk hücresi: ${covN} / 4096`;
+    $('hearTxt').textContent = `Duyulan vuruş: ${heard.onset} · çizilen: ${heard.drawn} · perdesiz: ${heard.lost}`;
     if (!n) {
       el.sw.style.setProperty('--sw', '#20222e');
       el.rgb.textContent = 'R   –  G   –  B   –'; el.hex.textContent = 'henüz nota yok';
@@ -1031,7 +1130,7 @@ button,input{font:inherit;color:inherit}
     if (!reduceMotion) {
       for (let i = notes.length - 1; i >= 0 && i >= notes.length - 6; i--) {
         const age = now - notes[i].t;
-        if (age < 700) drawNote(ga, notes[i], i, N, 1 - age / 700);
+        if (age < 1200) drawNote(ga, notes[i], i, N, 1 - age / 1200);
       }
     }
   }
@@ -1092,6 +1191,7 @@ button,input{font:inherit;color:inherit}
     } catch (_) { setStatus('PNG oluşturulamadı. Dosyayı tarayıcıda açıp yeniden dene.', true); }
   });
 
+  window.notaResmi = { notes, log: dbgLog };   // sınama ve merak için: çizilen notaların listesi
   resize();
   setShape('cardioid');
   setLayout('mandala');
